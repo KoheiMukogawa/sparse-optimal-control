@@ -56,6 +56,10 @@ class PathFollower(Node):
         self.pose = None  # (x, y, th)
         self.last_odom_time = None
         self.goal_reached = False
+        # 起動時の自己位置を経路原点にする（odomはノード再起動でも
+        # 基板の累積カウントを引き継ぐためゼロとは限らない）
+        self.origin = None  # (x0, y0, th0)
+        self.local_waypoints = list(self.waypoints)
 
         self.cmd_pub = self.create_publisher(Twist, 'rover_twist', 1)
         self.err_pub = self.create_publisher(Vector3, 'path_error', 1)
@@ -71,6 +75,15 @@ class PathFollower(Node):
         self.pose = (p.position.x, p.position.y,
                      yaw_from_quat_xyzw(q.x, q.y, q.z, q.w))
         self.last_odom_time = self.get_clock().now()
+        if self.origin is None:
+            x0, y0, th0 = self.pose
+            self.origin = (x0, y0, th0)
+            c, s = math.cos(th0), math.sin(th0)
+            self.local_waypoints = [
+                (x0 + wx * c - wy * s, y0 + wx * s + wy * c)
+                for wx, wy in self.waypoints]
+            self.get_logger().info(
+                f'経路原点を現在位置に設定: ({x0:.3f}, {y0:.3f}, {math.degrees(th0):.1f}deg)')
 
     def control_step(self):
         if self.pose is None or self.goal_reached:
@@ -82,17 +95,17 @@ class PathFollower(Node):
             return
 
         x, y, th = self.pose
-        gx, gy = self.waypoints[-1]
+        gx, gy = self.local_waypoints[-1]
         goal_dist = math.hypot(gx - x, gy - y)
         if (goal_dist < self.get_parameter('goal_tol').value
-                or goal_crossed(self.waypoints, x, y)):
+                or goal_crossed(self.local_waypoints, x, y)):
             self.cmd_pub.publish(Twist())
             self.goal_reached = True
             self.get_logger().info('目標到達。停止します')
             return
 
         x_r, y_r, th_r = reference_pose(
-            self.waypoints, x, y, self.get_parameter('lookahead').value)
+            self.local_waypoints, x, y, self.get_parameter('lookahead').value)
         x_e, y_e, th_e = tracking_error(x, y, th, x_r, y_r, th_r)
         self.err_pub.publish(Vector3(x=x_e, y=y_e, z=th_e))
 
