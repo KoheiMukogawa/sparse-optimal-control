@@ -1,67 +1,59 @@
-# Handoff - 2026-06-11
+# Handoff - 2026-06-12
 
 ## このセッションでやったこと
 
-### 環境整備
-- WSL側のGit認証をSSHに切り替え（`git remote set-url origin git@github.com:...`）
-- GitHubにWSL用SSHキー（ed25519）を登録
-- `git pull` でGitHubの最新状態をローカルに反映（3ファイル取得）
-- npmグローバルディレクトリを `~/.npm-global` に変更し、`claude-code` を sudo不要で更新
-- `.claude/settings.json` を作成し、デフォルトモデルを `claude-fable-5` に設定
+### 研究計画
+- `docs/research_plan.md` 作成（P1〜P7、中間発表9〜10月・提出2月・実機必須前提）
+- `docs/sprint_2026-06_自立走行.md` 作成（4日スプリント計画）
 
-### ドキュメント整備
-- `CLAUDE.md` を作成（研究概要・環境・ブランチ運用・実験管理・コミットルール）
-- `docs/handoff.md`（本ファイル）を作成
-
----
+### 自立走行の実装と空転テスト（exp/autonomous-drive ブランチ）★最大の進捗
+- 公式サンプル `vstoneofficial/lightrover_ros2` を調査:
+  - 速度指令トピックは **`rover_twist`**（`/cmd_vel` ではない）、/odomは約30Hz
+  - モータ制御・オドメトリはサンプル流用で済み、自作は経路追従ノードのみでよいと判明
+- 実装（SLAM・DDS・AMCLはスキップ、odomのみ・RPi完結構成）:
+  - `rover/follower_core.py` — 経路射影・Kanayama誤差・制御則（ROS非依存、L1-MPC差し替え時に流用）
+  - `rover/path_follower.py` — ROS2ノード（/odom→rover_twist、odom途絶で自動停止）
+  - `configs/path_straight_2m.yaml`, `configs/path_L_turn.yaml`
+  - `rover/test_follower_sim.py` — 運動学シミュレーションによる検証
+- シミュレーションで発見・修正したバグ:
+  - ゴール手前で減速しないと v_r/k_x（20cm）先の平衡点で停止 → 距離比例減速 `goal_scaled_vr` 追加
+  - 横偏差が残るとゴール判定円に入らない → ゴール線通過判定 `goal_crossed` 追加
+- **実機（ジャッキアップ・空転）テスト成功**:
+  - 直線2m: 13.8秒で目標到達（シミュレーション予測13.7秒とほぼ一致）
+  - L字（1.5m+90度旋回+1.5m）: 横0.46m初期ズレからの復帰込みで17.4秒で完走
+- RPi環境修正: transforms3d 0.3.1（apt版、np.float使用）が新numpyと非互換で
+  odom_manager が起動不能 → `pip install --user -U transforms3d`（0.4.2）で解決
 
 ## 現在の進捗
 
-### ハードウェア・ROS2（RPi4 LiteRover）
 | 項目 | 状態 |
 |------|------|
-| RPi4 ROS2 全ノード起動 | ✅ 完了 |
-| YDLiDAR X2 /scan配信 | ✅ 完了 |
-| teleop操作 | ✅ 完了 |
-| RViz2（SSH X11転送） | ✅ 表示確認済み |
-| SLAM（地図作成・保存） | ❌ 未完了 |
-| DDS通信（ラップトップ↔RPi ros2 topic list） | ❌ 未解決 |
-
-### 制御アルゴリズム
-| 項目 | 状態 |
-|------|------|
-| スパース制御オープンループシミュレーション | ✅ 完了（cvxpy, δωの78%がゼロ） |
-| MPC化（ローリングホライズン） | ❌ 未着手 |
-| CasADi + IPOPT導入 | ❌ 未着手 |
-| Kanayama誤差計算ノード（ROS2） | ❌ 未着手 |
-| L1スパース制御ノード（ROS2） | ❌ 未着手 |
-
----
+| Kanayama誤差計算＋経路追従制御 | ✅ 実装済み・空転テスト済み |
+| 床での実走行 | ❌ 未実施（モバイルバッテリー接続が必要） |
+| L1スパースMPCノード | ❌ 未着手（follower_coreに差し替える設計） |
+| SLAM / DDS | 保留（自立走行に不要と判断しスキップ中） |
 
 ## 次にやるべきこと（優先順）
 
-1. **DDS通信の解決 → ラップトップからSLAM可視化**
-   - WindowsファイアウォールのUDP 7400-7500を開放して試す
-   - または引き続きSSH X11転送でRViz2を使う方針に固定
-   - teleop操作しながらSLAMで地図を作成・保存する
+1. **床での実走行テスト**（モバイルバッテリー接続後）
+   - 直線2m → L字。rosbagで /odom, /rover_twist, /path_error を記録
+   - 実走行でのゲイン調整（k_y=5, k_th=3 はシミュレーション値のまま）
+2. **L1スパースMPCノード実装**（rover/にl1_mpc_follower.pyとして追加）
+   - RPi上でcvxpyの求解時間を計測してから本実装
+3. **exp/autonomous-drive のコミット**（ユーザー確認待ち）
 
-2. **Kanayama誤差計算ノードの実装（RPi側）**
-   - `/odom` と参照経路から横偏差・角度偏差・縦偏差を計算してパブリッシュ
-   - スパース制御への入力となる
+## 環境メモ（更新）
 
-3. **スパース MPC の実装**
-   - `docs/作業記録/sparse_rover.py` のオープンループL1制御をMPC化
-   - まずcvxpyのままローリングホライズンに拡張し、後でCasADiに移行
+- RPi接続OK: `ssh mukougawakouhei@192.168.0.31`
+- 実機コード配置: RPi `~/sparse_control/`（rover/, configs/）
+- ベースノード起動: `ros2 launch lightrover_ros nav_base.launch.py`（自立走行時はpos_joycon不可: gamepadとrover_twistが競合）
+- 経路追従: `cd ~/sparse_control/rover && python3 path_follower.py --ros-args -p path_file:=/home/mukougawakouhei/sparse_control/configs/path_straight_2m.yaml`
+- 停止: ノードのCtrl+C（終了時に停止指令送信）/ `pkill -f "[p]ath_follower"`
+- RTPS_TRANSPORT_SHMエラーは無害（UDPフォールバック）
+- **odomは再起動しないとリセットされない** → 連続テスト時はodom_manager再起動 or 経路を現在位置基準に
 
----
+## 懸念事項
 
-## 環境メモ
-
-- RPi接続: 家Wi-Fi=`ssh mukougawakouhei@192.168.0.31` / ホットスポット=`ssh mukougawakouhei@192.168.4.1`
-- DDS設定: `~/cyclonedds_laptop.xml`（ユニキャスト）
-- RPi側launchコマンド:
-  - 全体: `ros2 launch lightrover_ros pos_joycon.launch.py`
-  - SLAM: `ros2 launch lightrover_ros lightrover_slam.launch.py`
-  - RViz2: `DISPLAY=:0 rviz2 -d ~/rviz_slam.rviz`
-  - 地図保存: `ros2 run nav2_map_server map_saver_cli -f ~/map`
-- 参考コード: `docs/作業記録/sparse_rover.py`（cvxpyによるL1制御）
+- 空転テストは負荷なし。床では摩擦・慣性でゲイン再調整が必要な可能性
+- goal_tol=5cmはodomのみだと床では厳しいかも（ゴール線判定があるので完走はする）
+- 実走行時の安全: 初回はv_r=0.05に下げる選択肢も
