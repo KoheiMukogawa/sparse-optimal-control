@@ -41,7 +41,11 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 - L2-MPC シミュレーション: **完了** → `rover/mpc_core.py`, `rover/test_mpc_sim.py`
   - 全5ケース到達、横偏差RMSE は Kanayama を全ケースで下回る（L字 11.6→2.2cm 等）
   - L1 切替も動作（λ=1.0 で hands-off により直線到達・L字停滞を確認）
-- 次: P1.3 L1化とλスイープ（トレードオフ曲線）→ P1.4 `mpc_follower.py` 実機ノード化
+- L1化・λスイープ: **完了** → `rover/sweep_lambda.py`, `results/2026-06-13_lambda_sweep/`
+  - L1 は補正 δu を penalize（オープンループ版δω78%ゼロと整合）
+  - λ≈0.25 が L2 を3軸とも上回る、λ≥3 で破綻、採用レンジ 0.25〜2
+  - 無外乱simでは L2 も操舵が疎（85%）→ L1 の真価は外乱下（P4）で出る見込み
+- 次: P1.4 実機ノード化 `rover/mpc_follower.py`（L2/L1切替）→ 3者実機比較
 
 ### 旧現在地（2026-06-12時点）
 

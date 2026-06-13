@@ -71,8 +71,10 @@ class MPCFollower:
         for k in range(N):
             cost += cp.quad_form(z[:, k], Q)
             if reg == "l1":
-                # Maximum Hands-off: 実入力の L1 を最小化（v,ω を頻繁に 0 へ）
-                cost += lam * cp.norm1(self.u_nom + du[:, k])
+                # Maximum Hands-off: 参照速度からの補正 δu の L1 を最小化。
+                # → 補正をゼロに張り付かせ、巡航は維持したまま「補正を打つ
+                #   瞬間だけ動かす」スパース操舵を得る（オープンループ版78%ゼロと整合）。
+                cost += lam * cp.norm1(du[:, k])
             else:
                 cost += cp.quad_form(du[:, k], R)
             constr += [z[:, k + 1] == self.A @ z[:, k] + self.B @ du[:, k]]
