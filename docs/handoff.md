@@ -1,5 +1,9 @@
 # Handoff - 2026-06-13
 
+> **リポジトリ整理（2026-06-13）**: ブランチを **`main` 一本に集約**（旧 `master`・
+> `exp/autonomous-drive` は削除、全履歴は main に保存）。`README.md`・`results/README.md`
+> に索引を整備、`main.py`(uv雛形)削除・`pyproject` に `package=false`。以後は **main に直接コミット**。
+
 ## 2026-06-13 セッション7（L字3者比較＝実施／L1チャタ発見・原因と対策をsimで立証）
 
 - 床で Kanayama/L2/L1(λ=0.3) を **L字**（直線1.5m→左90°→直線1.5m, v_r0.1, N15）各1本
