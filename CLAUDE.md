@@ -33,7 +33,14 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 
 - 日本語で簡潔に（例: `MPCの雛形実装`, `L1正則化を追加`）
 
-## 現在地（2026-06-12時点）
+## 現在地（2026-06-13時点）
+
+- 実現可能性ゲート（RPi求解時間ベンチ）: **通過** → `results/2026-06-13_rpi_bench/`
+  - L2/L1 とも N=30 まで 0.1s 周期内（L2 p95≈18ms, L1 p95≈29ms）、低電圧なし
+  - 設計上限 N≤30。ベンチは `rover/bench_qp.py`
+- 次: L2-MPC シミュレーション（test_follower_sim 拡張）→ L1 化 → `mpc_follower.py`
+
+### 旧現在地（2026-06-12時点）
 
 - スパース制御シミュレーション（オープンループ）: 完了 → `docs/作業記録/sparse_rover.py`
 - 自立走行（Kanayama経路追従・odomのみ・RPi完結）: 完了 → `rover/path_follower.py`
