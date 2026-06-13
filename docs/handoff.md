@@ -1,5 +1,19 @@
 # Handoff - 2026-06-13
 
+## 2026-06-13 セッション4（P1.4 実機ノード化＝実装完了/実走行は未）
+
+- `rover/mpc_follower.py` 追加: path_follower.py と同 I/O・同経路原点ロジックで
+  制御則を MPCFollower に差し替え。reg=l2/l1, lam, horizon, rate(既定10Hz=0.1s)
+  をパラメータ化。求解時間を `mpc_solve_ms`(Float32) で配信（計算負荷の指標）。
+  求解失敗時は安全停止。Kanayama は既存 path_follower.py、これが MPC 側。
+- ローカル検証: py_compile OK、MPCFollower 構築・求解 OK。
+  注意: **L1 は bang-off 特性**で、補正時に ω が上限(2.0)へ張り付きやすい
+  （sparse制御の本質。sweepでは全到達なので可制御だが実機初回は慎重に）。
+- **未実施（要ユーザー許可）**: RPi へ配置 → ジャッキアップ空転テスト →
+  床で3者（Kanayama/L2/L1）実機比較。実機を動かすコマンドは毎回許可を取る。
+- 実機メモ: cvxpy import が RPi で 30〜60s。起動ログ「MPC準備完了」を待つ。
+  起動例: `python3 mpc_follower.py --ros-args -p path_file:=.../path_straight_2m.yaml -p reg:=l1 -p lam:=0.3`
+
 ## 2026-06-13 セッション3（P1.3 L1化・λスイープ＝完了）
 
 - 設計判断: L1 ペナルティ対象を **補正 δu**（参照速度からの偏差）に確定。
