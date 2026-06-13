@@ -44,12 +44,14 @@ class MPCFollower:
 
     def __init__(self, N=15, ts=0.1, reg="l2", lam=1.0,
                  v_max=0.15, w_max=2.0,
-                 q=(10.0, 10.0, 1.0), r=(1.0, 1.0), qf_scale=10.0):
+                 q=(10.0, 10.0, 1.0), r=(1.0, 1.0), qf_scale=10.0,
+                 move_suppress=0.0):
         self.N = N
         self.ts = ts
         self.reg = reg
         self.v_max = v_max
         self.w_max = w_max
+        self.move_suppress = move_suppress
 
         nx, nu = 3, 2
         # --- パラメータ（毎ステップ更新） ---
@@ -57,6 +59,10 @@ class MPCFollower:
         self.A = cp.Parameter((nx, nx))
         self.B = cp.Parameter((nx, nu))
         self.u_nom = cp.Parameter(nu)        # (v_r, w_r)
+        # 移動抑制（Δu率ペナルティ）用: 前ステップ実適用の δu。実機の求解/通信
+        # 遅延下で L1 の bang-bang が限界振動（チャタ）化するのを抑える。
+        self.du_prev = cp.Parameter(nu, value=np.zeros(nu)) if move_suppress > 0 else None
+        self._last_du = np.zeros(nu)
         # --- 変数 ---
         z = cp.Variable((nx, N + 1))
         du = cp.Variable((nu, N))            # 参照まわりの入力偏差
@@ -77,6 +83,10 @@ class MPCFollower:
                 cost += lam * cp.norm1(du[:, k])
             else:
                 cost += cp.quad_form(du[:, k], R)
+            if move_suppress > 0:
+                # Δu = δu_k - δu_{k-1}（k=0 は前回適用値）の二次ペナルティ
+                prev = self.du_prev if k == 0 else du[:, k - 1]
+                cost += move_suppress * cp.sum_squares(du[:, k] - prev)
             constr += [z[:, k + 1] == self.A @ z[:, k] + self.B @ du[:, k]]
             # 実速度の box 制約
             constr += [cp.abs(self.u_nom + du[:, k]) <= u_max]
@@ -95,6 +105,8 @@ class MPCFollower:
         A, B = error_dynamics(v_r, w_r, self.ts)
         self.A.value = A
         self.B.value = B
+        if self.du_prev is not None:
+            self.du_prev.value = self._last_du
         t0 = time.perf_counter()
         try:
             self.prob.solve(solver=cp.OSQP, warm_start=True)
@@ -105,6 +117,7 @@ class MPCFollower:
         if self.du.value is None:
             return None
         dv, dw = self.du.value[:, 0]
+        self._last_du = np.array([dv, dw])
         v = float(np.clip(v_r + dv, -self.v_max, self.v_max))
         w = float(np.clip(w_r + dw, -self.w_max, self.w_max))
         return v, w

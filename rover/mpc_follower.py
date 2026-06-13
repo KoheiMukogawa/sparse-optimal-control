@@ -44,6 +44,9 @@ class MpcFollowerNode(Node):
         self.declare_parameter('reg', 'l2')        # 'l2' or 'l1'
         self.declare_parameter('lam', 0.3)         # L1 正則化係数（sim採用域 0.25〜2）
         self.declare_parameter('horizon', 15)      # N（実機ベンチで N≤30 が0.1s内）
+        # 移動抑制（Δu率ペナルティ）。実機遅延下で L1 の bang-bang チャタを抑える。
+        # 既定0で従来挙動。L字チャタ対策は sim で ms≈2.0 が有効（Lturn_compare.md D節）。
+        self.declare_parameter('move_suppress', 0.0)
         self.declare_parameter('v_r', 0.1)         # 基準速度 [m/s]
         self.declare_parameter('lookahead', 0.15)  # 参照点を前方に置く距離 [m]
         self.declare_parameter('goal_tol', 0.05)   # 終点到達判定 [m]
@@ -65,10 +68,12 @@ class MpcFollowerNode(Node):
         lam = self.get_parameter('lam').value
         N = self.get_parameter('horizon').value
         rate = self.get_parameter('rate').value
+        move_suppress = self.get_parameter('move_suppress').value
         ts = 1.0 / rate
         # cvxpy 問題構築（RPiでは初回 import が遅い）
         self.mpc = MPCFollower(N=N, ts=ts, reg=reg, lam=lam,
-                               v_max=V_MAX, w_max=W_MAX)
+                               v_max=V_MAX, w_max=W_MAX,
+                               move_suppress=move_suppress)
 
         self.pose = None            # (x, y, th)
         self.last_odom_time = None
@@ -84,7 +89,8 @@ class MpcFollowerNode(Node):
         self.create_timer(ts, self.control_step)
         self.get_logger().info(
             f'MPC準備完了: reg={reg} '
-            f'{("lam=%.3f " % lam) if reg == "l1" else ""}N={N} '
+            f'{("lam=%.3f " % lam) if reg == "l1" else ""}'
+            f'{("ms=%.2f " % move_suppress) if move_suppress > 0 else ""}N={N} '
             f'rate={rate}Hz, {len(self.waypoints)}点, '
             f'v_r={self.get_parameter("v_r").value} m/s')
 
