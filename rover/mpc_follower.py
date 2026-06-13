@@ -156,7 +156,12 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        node.cmd_pub.publish(Twist())  # 終了時は必ず停止指令
+        # 終了時は必ず停止指令。ただし context が既に落ちている場合は
+        # publish が失敗するため握りつぶす（停止指令は到達時にも送出済み）。
+        try:
+            node.cmd_pub.publish(Twist())
+        except Exception:
+            pass
         node.destroy_node()
 
 
