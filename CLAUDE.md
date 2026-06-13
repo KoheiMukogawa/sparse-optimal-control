@@ -38,7 +38,10 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 - 実現可能性ゲート（RPi求解時間ベンチ）: **通過** → `results/2026-06-13_rpi_bench/`
   - L2/L1 とも N=30 まで 0.1s 周期内（L2 p95≈18ms, L1 p95≈29ms）、低電圧なし
   - 設計上限 N≤30。ベンチは `rover/bench_qp.py`
-- 次: L2-MPC シミュレーション（test_follower_sim 拡張）→ L1 化 → `mpc_follower.py`
+- L2-MPC シミュレーション: **完了** → `rover/mpc_core.py`, `rover/test_mpc_sim.py`
+  - 全5ケース到達、横偏差RMSE は Kanayama を全ケースで下回る（L字 11.6→2.2cm 等）
+  - L1 切替も動作（λ=1.0 で hands-off により直線到達・L字停滞を確認）
+- 次: P1.3 L1化とλスイープ（トレードオフ曲線）→ P1.4 `mpc_follower.py` 実機ノード化
 
 ### 旧現在地（2026-06-12時点）
 
