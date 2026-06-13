@@ -1,7 +1,7 @@
 [project]
 name = "sparse-optimal-control"
 version = "0.1.0"
-description = "Add your description here"
+description = "農業ロボットの経路追従におけるスパース最適制御（Maximum Hands-off Control）の研究"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,3 +12,8 @@ dependencies = [
     "rosbags>=0.11.3",
     "scipy>=1.17.1",
 ]
+
+[tool.uv]
+# 配布パッケージではなく rover/ のスクリプト群を `uv run python rover/xxx.py` で
+# 実行する運用。プロジェクト自体はビルドしないため main.py/src レイアウトは不要。
+package = false
