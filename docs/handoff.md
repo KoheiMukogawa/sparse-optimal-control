@@ -1,8 +1,27 @@
-# Handoff - 2026-06-30
+# Handoff - 2026-07-14
 
 > **リポジトリ整理（2026-06-13）**: ブランチを **`main` 一本に集約**（旧 `master`・
 > `exp/autonomous-drive` は削除、全履歴は main に保存）。`README.md`・`results/README.md`
 > に索引を整備、`main.py`(uv雛形)削除・`pyproject` に `package=false`。以後は **main に直接コミット**。
+
+## 2026-07-14 セッション11（バッチ実験ランナー実装）
+
+- 設計: `docs/superpowers/specs/2026-07-14-batch-runner-design.md`（承認済み）。
+  実験サイクル（起動→bag→解析→CSV）を条件YAMLで自動化。sim/実機バックエンド差し替え式。
+- 実装（テスト21本・`uv run pytest tests/`）:
+  - `rover/exp_metrics.py`: 指標計算を共通化（4指標＋ω反転・飽和）。analyze_bag は
+    これを使う形に改修し、6/13実機bagで回帰テスト（記録値と一致）。
+  - `rover/exp_backends.py`: SimBackend（遅延・ノイズ付き閉ループsim。
+    L1チャタ/ms=2.0対策の既知結果を再現）＋ RealBackend（SSHでノード起動・
+    bag記録・SIGINT停止・scp回収。1本ごと Enter待ち＝走行許可。dry-run可）。
+  - `rover/run_batch.py`: CLI（--resume/--only/--dry-run/--summarize/--outdir）。
+    `results/<日付>_<名前>/runs.csv`＋`summary.md`（条件別 平均±標準偏差）。
+  - `configs/batch_Lturn_3way.yaml`: Kanayama/L2/L1/L1+ms2.0 × 3本のL字バッチ。
+- 実機ではまだ走らせていない（dry-run検証まで）。次回実機時の手順:
+  1. RPi へ rover/ を scp 配置（preflight が md5 差異を警告する）
+  2. RPi で nav_base 起動 → `uv run python rover/run_batch.py
+     configs/batch_Lturn_3way.yaml --backend real`
+  3. 1本ごとに原点復帰して Enter（初回バッチが RealBackend の統合テスト）
 
 ## 2026-06-30 セッション10（発表を「①論文解説 → ②経過報告」に再構成＋全体デザイン調整）
 
