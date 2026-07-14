@@ -56,3 +56,20 @@ def test_make_row():
     assert row["ok"] is True and row["rmse_cm"] == 2.0
     assert row["git_hash"] == "abc123" and row["v_r"] == 0.1
     assert set(row) == set(CSV_COLUMNS)
+
+
+def test_write_summary(tmp_path):
+    from run_batch import write_summary
+    csv_path = tmp_path / "runs.csv"
+    for rep, rmse, flips in [(1, 2.0, 0), (2, 3.0, 2)]:
+        row = {c: "" for c in CSV_COLUMNS}
+        row.update(batch="mini", cond="l1", rep=rep, ok=True,
+                   rmse_cm=rmse, sum_u=5.0, flips=flips,
+                   w_zero_ratio=0.9, solve_p95=50.0)
+        append_row(str(csv_path), row)
+    write_summary(str(tmp_path))
+    text = (tmp_path / "summary.md").read_text()
+    assert "l1" in text
+    assert "2.50" in text       # rmse平均 (2.0+3.0)/2
+    assert "±" in text          # 標準偏差表記
+    assert "2/2" in text        # 到達率

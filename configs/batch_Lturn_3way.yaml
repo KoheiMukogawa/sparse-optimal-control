@@ -1,0 +1,13 @@
+# L字 3手法＋修正版L1 比較バッチ（sim開発用・実機は --backend real）
+name: Lturn_3way
+path_file: configs/path_L_turn.yaml
+backend: sim
+repeats: 3
+timeout_s: 60
+common: {horizon: 15, rate: 10.0}
+sim: {delay_steps: 2, pos_noise: 0.0, yaw_noise: 0.0}   # 遅延2step=実機相当
+conditions:
+  - {name: kanayama, controller: kanayama}
+  - {name: l2,       controller: l2}
+  - {name: l1,       controller: l1, lam: 0.3}
+  - {name: l1_ms2,   controller: l1, lam: 0.3, move_suppress: 2.0}
