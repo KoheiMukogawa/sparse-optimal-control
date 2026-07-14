@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ from analyze_bag import analyze
 REPO = Path(__file__).resolve().parent.parent
 LTURN_L1 = REPO / "results" / "2026-06-13_Lturn_l1"
 LTURN_L2 = REPO / "results" / "2026-06-13_Lturn_l2"
+LTURN_KANAYAMA = REPO / "results" / "2026-06-13_Lturn_kanayama"
 
 
 @pytest.mark.skipif(not LTURN_L1.exists(), reason="実機bagなし")
@@ -29,3 +31,16 @@ def test_regression_lturn_l2():
     assert m["rmse_cm"] == pytest.approx(1.42, abs=0.05)
     assert m["sum_u"] == pytest.approx(4.54, abs=0.05)
     assert m["flips"] == 0
+
+
+@pytest.mark.skipif(not LTURN_KANAYAMA.exists(), reason="実機bagなし")
+def test_regression_lturn_kanayama_nan_solve():
+    """Kanayamaは/mpc_solve_msを配信しないため空トピック → solve_*はNaN。
+    NaN伝播でクラッシュしないこと・安定な指標が既存記録値と一致することの回帰。"""
+    m = analyze(str(LTURN_KANAYAMA))
+    assert m["rmse_cm"] == pytest.approx(11.27, abs=0.05)
+    assert m["sum_u"] == pytest.approx(4.88, abs=0.05)
+    assert m["flips"] == 0
+    assert math.isnan(m["solve_p50"])
+    assert math.isnan(m["solve_p95"])
+    assert math.isnan(m["solve_max"])

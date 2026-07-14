@@ -19,9 +19,28 @@
   - `configs/batch_Lturn_3way.yaml`: Kanayama/L2/L1/L1+ms2.0 × 3本のL字バッチ。
 - 実機ではまだ走らせていない（dry-run検証まで）。次回実機時の手順:
   1. RPi へ rover/ を scp 配置（preflight が md5 差異を警告する）
+  1.5. 手順2の前に: SSHでROS環境確認 `ssh <rpi> 'bash -lc "which ros2 && python3 -c \"import rclpy\""'`
+     （失敗ならRPi側の環境を確認）
   2. RPi で nav_base 起動 → `uv run python rover/run_batch.py
-     configs/batch_Lturn_3way.yaml --backend real`
+     configs/batch_Lturn_3way.yaml --backend real
+     --outdir results/<日付>_Lturn_3way_real`（同日sim/dry-runとの混在防止のため明示推奨。
+     既定でも `_real`/`_sim` などbackend別のoutdirになった）
+  2.5. ×12本の前に `--only l2` で1本スモーク（起動→到達検知→scp→解析の統合確認）
   3. 1本ごとに原点復帰して Enter（初回バッチが RealBackend の統合テスト）
+  - 注記: Kanayamaは実機20Hz/sim10Hzで走らせてきた（rateパラメータは渡していない・6/13基準と整合のため）
+
+- **最終レビュー指摘の修正（2026-07-15、当セッション追記）**: `rover/exp_backends.py`・
+  `rover/run_batch.py` に対する Important 4件＋Minor 2件を修正（テスト24本・全pass）。
+  - ROS環境: `node_command`/`bag_record_command` に `ROS_SETUP`（setup.bash明示source）を
+    先頭付与（非対話sshシェルは.bashrcを読まないため。従来は実機で確実に落ちていた）。
+  - 到達検知: `select()`のraw fd監視とtext=Trueバッファのズレで複数行coalesce時に
+    目標到達を見落とすバグを修正。readerスレッド＋dequeの `watch_node()` に置き換え
+    （単体テストあり、ssh不要のローカルsubprocessで検証）。
+  - `run_one()`: scp前に `shutil.rmtree(bagdir, ignore_errors=True)`（再走時のネスト防止）。
+  - `run_batch.py`: 既定outdirに `_<backend>` を付与（sim/real混在によるrunsCSV汚染・
+    --resumeの誤スキップ防止）。
+  - Minor: preflightの同期チェックにpath_fileを追加。Kanayama実機bag(2026-06-13_Lturn_kanayama、
+    solve_*がNaN)の回帰テストを追加。
 
 ## 2026-06-30 セッション10（発表を「①論文解説 → ②経過報告」に再構成＋全体デザイン調整）
 

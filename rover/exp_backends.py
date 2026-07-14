@@ -11,10 +11,11 @@ RealBackend: SSHでRPiのノード起動・bag記録・回収を行う実機用�
 
 import math
 import random
-import select
 import shlex
+import shutil
 import subprocess
 import sys
+import threading
 import time
 from collections import deque
 from pathlib import Path
@@ -134,6 +135,9 @@ BAG_TOPICS = '/odom /rover_twist /path_error /mpc_solve_ms'
 SYNC_FILES = ['rover/mpc_follower.py', 'rover/path_follower.py',
               'rover/follower_core.py', 'rover/mpc_core.py']
 STARTUP_MARGIN_S = {'kanayama': 15, 'l2': 90, 'l1': 90}  # cvxpy import 30-60s
+# ssh ... bash -lc は非対話shellのため .bashrc が早期returnしROS環境が
+# 通らない（rclpy ImportError等）。setup.bash を毎回明示sourceする。
+ROS_SETUP = 'source /opt/ros/humble/setup.bash 2>/dev/null'
 
 
 def node_command(cond, common, path_file):
@@ -148,12 +152,50 @@ def node_command(cond, common, path_file):
                    f"-p move_suppress:={cond.get('move_suppress', 0.0)}",
                    f"-p horizon:={common.get('horizon', 15)}",
                    f"-p rate:={common.get('rate', 10.0)}"]
-    return (f'cd {RPI_ROOT}/rover && python3 {script} --ros-args '
-            + ' '.join(params))
+    return (f'{ROS_SETUP} && cd {RPI_ROOT}/rover && python3 {script} '
+            '--ros-args ' + ' '.join(params))
 
 
 def bag_record_command(remote_dir):
-    return f'ros2 bag record -o {remote_dir} {BAG_TOPICS}'
+    return f'{ROS_SETUP} && ros2 bag record -o {remote_dir} {BAG_TOPICS}'
+
+
+def watch_node(proc, deadline_s):
+    """node の stdout を別スレッドで読み、'目標到達' が出るか deadline まで監視する。
+
+    text=Trueの読み込みバッファはselect()の監視対象（rawfd）とズレるため、
+    1回のflushで複数行届くと select が新着を検知できず後続行を見落とす
+    （目標到達行が読まれずタイムアウト扱いになる）バグへの対策。
+    readerスレッドがdequeへ流し込み、メインループはdequeを消費するだけにする。
+    """
+    lines = deque()
+
+    def _reader():
+        for line in proc.stdout:
+            lines.append(line)
+
+    t = threading.Thread(target=_reader, daemon=True)
+    t.start()
+
+    reached = False
+    while time.time() < deadline_s:
+        drained = False
+        while lines:
+            drained = True
+            line = lines.popleft()
+            sys.stdout.write('  | ' + line)
+            if '目標到達' in line:
+                reached = True
+                break
+        if reached:
+            break
+        # dequeが空でプロセスも終了済みなら、直前で最後まで drain 済みなので
+        # 取りこぼしなく終了できる（求解失敗等でノードが落ちたケース）。
+        if not lines and proc.poll() is not None:
+            break
+        if not drained:
+            time.sleep(0.2)
+    return reached
 
 
 KILL_CMD = ("pkill -INT -f '[m]pc_follower.py'; "
@@ -207,7 +249,7 @@ class RealBackend:
                 '  ros2 launch lightrover_ros nav_base.launch.py')
 
         # コード同期チェック（差異は警告のみ・配置更新は手動）
-        for f in SYNC_FILES:
+        for f in SYNC_FILES + [self.batch['path_file']]:
             local = subprocess.run(['md5sum', str(REPO_ROOT / f)],
                                    capture_output=True,
                                    text=True).stdout.split()[0]
@@ -248,21 +290,8 @@ class RealBackend:
                                 stderr=subprocess.STDOUT, text=True)
         margin = STARTUP_MARGIN_S[cond['controller']]
         deadline = time.time() + float(self.batch['timeout_s']) + margin
-        reached = False
         try:
-            while time.time() < deadline:
-                ready, _, _ = select.select([node.stdout], [], [], 1.0)
-                if not ready:
-                    if node.poll() is not None:
-                        break  # ノードが落ちた（求解失敗等）
-                    continue
-                line = node.stdout.readline()
-                if not line:
-                    break
-                sys.stdout.write('  | ' + line)
-                if '目標到達' in line:
-                    reached = True
-                    break
+            reached = watch_node(node, deadline)
         finally:
             self._ssh(KILL_CMD)
             time.sleep(1.0)          # 停止指令publish・bag flush待ち
@@ -272,6 +301,7 @@ class RealBackend:
 
         bagdir = Path(outdir) / f"{cond['name']}_r{rep}"
         bagdir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(bagdir, ignore_errors=True)  # 再走時にscpがネストするのを防ぐ
         subprocess.run(['scp', '-q', '-r',
                         f'{SSH_USER}@{self.host}:{remote_bag}',
                         str(bagdir)], check=True)

@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """バッチ実験ランナー CLI（設計: specs/2026-07-14-batch-runner-design.md）。
 
-configs/batch_*.yaml の条件×反復を実行し、results/<日付>_<名前>/ に
+configs/batch_*.yaml の条件×反復を実行し、results/<日付>_<名前>_<backend>/ に
 runs.csv（1走行1行・逐次追記）と summary.md（条件別 平均±標準偏差）を出力。
+（backend は sim/real。--outdir 明示時はそのまま使う。同日sim/real混在での
+runs.csv汚染を防ぐため既定値にbackend種別を含める）
 
 使い方:
   uv run python rover/run_batch.py configs/batch_Lturn_3way.yaml
@@ -166,7 +168,8 @@ def main():
     batch = load_batch(args.batch_yaml)
     backend_kind = args.backend or batch['backend']
     outdir = Path(args.outdir or
-                  f"results/{datetime.date.today()}_{batch['name']}")
+                  f"results/{datetime.date.today()}_{batch['name']}"
+                  f"_{backend_kind}")
     csv_path = outdir / 'runs.csv'
 
     if args.summarize:
