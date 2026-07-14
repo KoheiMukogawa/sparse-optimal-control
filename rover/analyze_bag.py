@@ -7,6 +7,10 @@
   - 入力スパース性: |ω|<閾 のステップ率（操舵の疎度）
   - 計算負荷      : /mpc_solve_ms の p50/p95/max（実機求解時間）
 
+チャタ診断（反転・飽和指標）:
+  - ω符号反転    : 走行中の角速度の符号変化回数（ジッター検知）
+  - 飽和率        : |ω|>1.5 の時間割合（ロボ上限=2.0の75%）
+
 注意: ジャッキアップ空転 bag では path_error は「仮想odomへの追従」で外乱が
 ないため RMSE はほぼ0になる（参考値）。実機RMSEの比較は床走行 bag で行う。
 求解時間と入力プロファイルは空転でも実機の実測として有効。
@@ -16,21 +20,20 @@
 """
 
 import argparse
-import math
 import sys
 from pathlib import Path
 
 from rosbags.highlevel import AnyReader
 from rosbags.typesys import Stores, get_typestore
 
+from exp_metrics import compute_metrics
+
 # Humble の bag は型定義を埋め込まないため既定 typestore を渡す
 TYPESTORE = get_typestore(Stores.ROS2_HUMBLE)
 
-W_ZERO = 0.05   # |ω|<これ をゼロ操舵とみなす [rad/s]
-V_ACTIVE = 0.005  # |v|>これ を「走行中」とみなす [m/s]
 
-
-def analyze(bagdir):
+def read_bag(bagdir):
+    """bag → 時系列 (twist, perr, solve_ms)。compute_metrics に渡す形式。"""
     twist = []   # (t_s, v, w)
     perr = []    # (t_s, y_e)
     solve = []   # ms
@@ -46,36 +49,14 @@ def analyze(bagdir):
             elif conn.topic == '/mpc_solve_ms':
                 m = reader.deserialize(raw, conn.msgtype)
                 solve.append(float(m.data))
+    return twist, perr, solve
 
+
+def analyze(bagdir):
+    twist, perr, solve = read_bag(bagdir)
     if not twist:
         raise SystemExit(f"{bagdir}: /rover_twist が空")
-
-    # 走行区間 = |v|>V_ACTIVE が続く窓（最初の発進〜最後の駆動）
-    active = [(t, v, w) for t, v, w in twist if abs(v) > V_ACTIVE]
-    if not active:
-        active = twist
-    t0, t1 = active[0][0], active[-1][0]
-    dt = (t1 - t0) / max(1, len(active) - 1)
-
-    sum_u = sum((abs(v) + abs(w)) for _, v, w in active) * dt
-    w_zero = sum(1 for _, _, w in active if abs(w) < W_ZERO) / len(active)
-    # RMSE は走行区間の path_error.y から
-    ye = [y for t, y in perr if t0 - 0.2 <= t <= t1 + 0.2]
-    rmse_cm = 100.0 * math.sqrt(sum(y * y for y in ye) / len(ye)) if ye else float('nan')
-
-    solve.sort()
-    def pct(p): return solve[min(len(solve) - 1, int(p * len(solve)))] if solve else float('nan')
-
-    return dict(
-        name=Path(bagdir).name,
-        drive_s=t1 - t0,
-        steps=len(active),
-        rmse_cm=rmse_cm,
-        sum_u=sum_u,
-        w_zero_ratio=w_zero,
-        solve_p50=pct(0.50), solve_p95=pct(0.95),
-        solve_max=solve[-1] if solve else float('nan'),
-    )
+    return dict(name=Path(bagdir).name, **compute_metrics(twist, perr, solve))
 
 
 def main():
@@ -86,12 +67,13 @@ def main():
     rows = [analyze(b) for b in args.bags]
 
     hdr = (f"{'bag':<26} {'走行s':>6} {'RMSE_cm':>8} {'Σ|u|':>7} "
-           f"{'ω0率':>6} {'解p50':>6} {'解p95':>6} {'解max':>6}")
+           f"{'ω0率':>6} {'反転':>4} {'飽和':>5} {'解p50':>6} {'解p95':>6} {'解max':>6}")
     print(hdr)
     print("-" * len(hdr))
     for r in rows:
         print(f"{r['name']:<26} {r['drive_s']:>6.1f} {r['rmse_cm']:>8.2f} "
               f"{r['sum_u']:>7.2f} {r['w_zero_ratio']*100:>5.0f}% "
+              f"{r['flips']:>4d} {r['sat_ratio']*100:>4.0f}% "
               f"{r['solve_p50']:>5.1f} {r['solve_p95']:>5.1f} {r['solve_max']:>5.1f}")
     print("\n注: 空転bagのRMSEは仮想odom追従の参考値（外乱なし）。"
           "求解時間[ms]と入力プロファイルは実機実測。", file=sys.stderr)
