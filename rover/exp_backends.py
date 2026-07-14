@@ -129,7 +129,8 @@ class SimBackend:
 # 安全系はノード既存機構（到達停止・SIGINT停止・odom途絶停止）に委ねる。
 
 SSH_USER = 'mukougawakouhei'
-SSH_HOSTS = ['192.168.0.31', '192.168.4.1']   # 家Wi-Fi → ホットスポットの順
+# 家Wi-Fi（DHCPで.31→.32に変動歴あり。恒久対策はルーターの固定割当）→ ホットスポットの順
+SSH_HOSTS = ['192.168.0.32', '192.168.0.31', '192.168.4.1']
 RPI_ROOT = '/home/mukougawakouhei/sparse_control'
 BAG_TOPICS = '/odom /rover_twist /path_error /mpc_solve_ms'
 SYNC_FILES = ['rover/mpc_follower.py', 'rover/path_follower.py',

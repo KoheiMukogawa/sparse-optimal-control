@@ -11,7 +11,8 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 - 実機: LiteRover（ヴィストン, RPi4, Ubuntu 22.04, ROS2 Humble）
 - DDS設定: ~/scripts/cyclonedds_laptop.xml（ユニキャスト、ラップトップ192.168.0.9↔RPi192.168.0.31）
 - RPi接続:
-  - 家Wi-Fi: `ssh mukougawakouhei@192.168.0.31`
+  - 家Wi-Fi: `ssh mukougawakouhei@192.168.0.32`（2026-07-15にDHCPで.31→.32へ変動。
+    恒久対策はルーターでMAC固定割当。繋がらない時はポート22走査で現IPを探す）
   - RPiホットスポット: `ssh mukougawakouhei@192.168.4.1`
   - どちらか繋がらない場合はもう一方を試す
 
