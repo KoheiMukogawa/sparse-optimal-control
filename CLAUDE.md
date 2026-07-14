@@ -9,7 +9,7 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 
 - 開発環境: Surface Laptop Go, WSL2 Ubuntu 24.04, ROS2 Jazzy（メモリ少なめ）
 - 実機: LiteRover（ヴィストン, RPi4, Ubuntu 22.04, ROS2 Humble）
-- DDS設定: ~/cyclonedds_laptop.xml（ユニキャスト、ラップトップ192.168.0.9↔RPi192.168.0.31）
+- DDS設定: ~/scripts/cyclonedds_laptop.xml（ユニキャスト、ラップトップ192.168.0.9↔RPi192.168.0.31）
 - RPi接続:
   - 家Wi-Fi: `ssh mukougawakouhei@192.168.0.31`
   - RPiホットスポット: `ssh mukougawakouhei@192.168.4.1`
@@ -65,6 +65,12 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
   - 位置づけ: 「L1優位」でなく「ナイーブL1は実機遅延下でチャタ＝実機検証必須」。総合最良は現状 L2-MPC
 - teleop: `rover/teleop_key.py`（連続・前進と旋回独立・V_MAX0.15）RPi配置済み
 - 次: 修正版 L1(`move_suppress:=2.0`) を実機 L字で再走しチャタ消失を確認（要許可） → 外乱条件 / 直線反復(n≥3)で統計化
+
+## 環境変更（2026-07-05）
+
+- WSLホーム整理により、リポジトリが `~/sparse-optimal-control` → `~/projects/sparse-optimal-control` に移動。
+- DDS設定ファイルも `~/cyclonedds_laptop.xml` → `~/scripts/cyclonedds_laptop.xml` に移動済み（`.bashrc` の `CYCLONEDDS_URI` は更新済み。RPi側は変更なし）。
+- ホーム直下のnano復旧ファイルから、6/13 L字床走行の外部計測の生メモ（Kanayama/L2/L1、CLAUDE.mdの外部計測値の一次記録）を `docs/作業記録/2026-06-13_L字外部計測メモ.md` として回収。
 
 ### 旧現在地（2026-06-12時点）
 
