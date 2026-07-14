@@ -109,6 +109,9 @@ class SimBackend:
                        self.batch.get('sim', {}),
                        float(self.batch.get('timeout_s', 60)),
                        seed=rep)
+        if not data['twist']:
+            return dict(ok=data['ok'], metrics={}, bagdir='',
+                        note='走行データなし（即到達または初手求解失敗）')
         metrics = compute_metrics(data['twist'], data['perr'], data['solve_ms'])
         note = '' if data['ok'] else 'タイムアウト/求解失敗'
         return dict(ok=data['ok'], metrics=metrics, bagdir='', note=note)

@@ -40,3 +40,14 @@ def test_l1_move_suppress_fixes_chatter():
     r = run("l1", lam=0.3, move_suppress=2.0)
     assert r["ok"]
     assert r["metrics"]["flips"] <= 3  # sim_delay_probe実績: 1回
+
+
+def test_empty_run_returns_record(tmp_path):
+    # スタート地点がほぼゴール → 1ステップも走らず終了。例外でなくrecordを返すこと
+    p = tmp_path / "path_tiny.yaml"
+    p.write_text("waypoints: [[0.0, 0.0], [0.001, 0.0]]\nv_r: 0.1\n")
+    batch = dict(BATCH, path_file=str(p))
+    r = SimBackend(batch).run_one(dict(name="l2", controller="l2"), 1, None)
+    assert r["ok"] is True
+    assert r["metrics"] == {}
+    assert "走行データなし" in r["note"]
