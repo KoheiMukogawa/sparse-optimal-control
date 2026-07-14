@@ -13,6 +13,7 @@ runs.csv（1走行1行・逐次追記）と summary.md（条件別 平均±標�
 import argparse
 import csv
 import datetime
+import math
 import statistics
 import subprocess
 from pathlib import Path
@@ -106,8 +107,7 @@ def git_hash_short():
 
 
 def _mean_std(vals):
-    import math
-    # Filter out NaN values
+    # NaN除外（kanayamaは求解しないため solve_* が nan になる）
     valid = [v for v in vals if not math.isnan(v)]
     if not valid:
         return 'n/a'

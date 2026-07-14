@@ -73,3 +73,21 @@ def test_write_summary(tmp_path):
     assert "2.50" in text       # rmse平均 (2.0+3.0)/2
     assert "±" in text          # 標準偏差表記
     assert "2/2" in text        # 到達率
+
+
+def test_write_summary_nan_solve(tmp_path):
+    """kanayama行のsolve_*はnan → クラッシュせず n/a になる（回帰テスト）。"""
+    from run_batch import write_summary
+    csv_path = tmp_path / "runs.csv"
+    for rep, p95 in [(1, float("nan")), (2, float("nan")), (3, "")]:
+        row = {c: "" for c in CSV_COLUMNS}
+        row.update(batch="mini", cond="kanayama", rep=rep, ok=True,
+                   rmse_cm=11.2, sum_u=4.8, flips=0,
+                   w_zero_ratio=0.65, solve_p95=p95)
+        append_row(str(csv_path), row)
+    write_summary(str(tmp_path))  # nan混在でも例外を出さない
+    text = (tmp_path / "summary.md").read_text()
+    line = next(ln for ln in text.splitlines() if ln.startswith("| kanayama"))
+    assert "n/a" in line          # solve_p95 は全て nan/空 → n/a
+    assert "11.20" in line        # 他の列は通常どおり平均される
+    assert "3/3" in line
