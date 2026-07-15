@@ -55,9 +55,11 @@ def solve_camera_pose(floor_tags, detections, K, dist):
             img.append(tag_center(detections[tid]))
     if len(obj) < 4:
         raise CalibError(f'床基準タグ検出 {len(obj)}/4 枚（4枚必要）')
+    # 正対面付近の平面PnPは IPPE だと画素ノイズがcm級に増幅されるため、
+    # ホモグラフィ初期化＋LM精緻化の ITERATIVE を使う（4点共面でOK）
     ok, rvec, tvec = cv2.solvePnP(
         np.asarray(obj, dtype=np.float64), np.asarray(img, dtype=np.float64),
-        K, dist, flags=cv2.SOLVEPNP_IPPE)
+        K, dist, flags=cv2.SOLVEPNP_ITERATIVE)
     if not ok:
         raise CalibError('solvePnP 失敗')
     return rvec, tvec

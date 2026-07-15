@@ -46,7 +46,7 @@ def test_solve_camera_pose_recovers_camera_center():
     rvec, tvec = look_down_pose()
     det = detect_tags(_floor_scene(rvec, tvec), make_detector())
     rv, tv = solve_camera_pose(FLOOR_TAGS, det, K_TEST, DIST0)
-    assert np.allclose(camera_center(rv, tv), [0.75, 0.75, 2.4], atol=0.065)
+    assert np.allclose(camera_center(rv, tv), [0.75, 0.75, 2.4], atol=0.02)
 
 
 def test_solve_camera_pose_needs_4_tags():
