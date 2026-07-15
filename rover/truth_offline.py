@@ -27,20 +27,36 @@ from truth_core import (CalibError, camera_center, detect_tags,
 
 
 def load_config(path):
-    """camera_truth.yaml → dict(K, dist, floor_tags, robot)。未記入を検知。"""
+    """camera_truth.yaml → dict(K, dist, image_size, floor_tags, robot)。未記入を検知。"""
     with open(path) as f:
         cfg = yaml.safe_load(f)
     cam = cfg['camera']
     if cam.get('K') is None or cam.get('dist') is None:
         raise CalibError('camera.K/dist が未記入。rover/calibrate_camera.py '
                          'の出力を貼り付けること')
+    if cam.get('image_size') is None:
+        raise CalibError('camera.image_size が未記入。キャリブ動画の解像度を記入')
     floor = cfg['floor_tags']
     if any(v is None for v in floor.values()):
         raise CalibError('floor_tags に未記入あり。タグ中心のコース座標[m]を実測して記入')
     return dict(K=np.asarray(cam['K'], dtype=np.float64),
                 dist=np.asarray(cam['dist'], dtype=np.float64),
+                image_size=tuple(cam['image_size']),
                 floor_tags={int(k): tuple(v) for k, v in floor.items()},
                 robot=cfg['robot_tag'])
+
+
+def _check_size(gray, cfg):
+    """K はキャリブ時の解像度・向きにしか合わない。不一致は無警告で
+    9〜18cm 級の誤差になる（合成で実測）ため即エラーにする。"""
+    expect = cfg.get('image_size')
+    if expect is None:
+        return
+    if (gray.shape[1], gray.shape[0]) != tuple(expect):
+        raise CalibError(
+            f'フレーム {gray.shape[1]}x{gray.shape[0]} が設定 image_size '
+            f'{expect[0]}x{expect[1]} と不一致。キャリブ時と同じ解像度・'
+            '持ち方（縦横）で撮り直すか、camera_truth.yaml を確認')
 
 
 def _solve_from_avg(per_tag, cfg):
@@ -60,6 +76,7 @@ def run_video(frames_fn, cfg, calib_frames=30):
     # ---- 1パス目: 床タグ中心を平均してカメラ姿勢 ----
     per_tag, used = {}, 0
     for _, gray in frames_fn():
+        _check_size(gray, cfg)
         det = detect_tags(gray, detector)
         if all(t in det for t in cfg['floor_tags']):
             for tid in cfg['floor_tags']:
@@ -78,6 +95,7 @@ def run_video(frames_fn, cfg, calib_frames=30):
     rows = []
     tail = deque(maxlen=30)   # 末尾のカメラずれ検知用
     for t, gray in frames_fn():
+        _check_size(gray, cfg)
         det = detect_tags(gray, detector)
         if all(k in det for k in cfg['floor_tags']):
             tail.append({tid: tag_center(det[tid])

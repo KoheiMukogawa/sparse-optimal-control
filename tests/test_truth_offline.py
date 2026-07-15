@@ -49,3 +49,17 @@ def test_run_video_marks_missing():
     frames, _ = _traj_frames()
     rows, _ = run_video(lambda: iter(frames), CFG, calib_frames=5)
     assert rows[15][1] is None and rows[16][1] is None
+
+
+def test_run_video_checks_image_size():
+    """K はキャリブ解像度にしか合わない: 一致で通過、不一致は CalibError。"""
+    import pytest
+
+    from truth_core import CalibError
+    frames, _ = _traj_frames(n=5, drop=())
+    ok_cfg = dict(CFG, image_size=(1280, 720))
+    rows, _ = run_video(lambda: iter(frames), ok_cfg, calib_frames=2)
+    assert rows[0][1] is not None
+    bad_cfg = dict(CFG, image_size=(1920, 1080))
+    with pytest.raises(CalibError):
+        run_video(lambda: iter(frames), bad_cfg, calib_frames=2)

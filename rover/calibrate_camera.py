@@ -66,7 +66,8 @@ def main():
     print(f'フレーム {len(grays)} 枚使用 / 再投影誤差 {err:.3f} px'
           f'（0.5px以下が目安）')
     print('--- configs/camera_truth.yaml に貼り付け ---')
-    print(f'  image_size: [{int(2 * K[0, 2])}, {int(2 * K[1, 2])}]  # 概算・撮影解像度を確認')
+    h, w = grays[0].shape
+    print(f'  image_size: [{w}, {h}]')
     print('  K:')
     for row in K:
         print(f'    - [{row[0]:.2f}, {row[1]:.2f}, {row[2]:.2f}]')
