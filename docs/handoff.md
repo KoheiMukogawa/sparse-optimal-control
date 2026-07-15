@@ -1,4 +1,28 @@
-# Handoff - 2026-07-15
+# Handoff - 2026-07-16
+
+## 2026-07-16 セッション13（カメラ真値パイプライン Phase 1 実装完了）
+
+- 設計承認: `docs/superpowers/specs/2026-07-16-camera-truth-pipeline-design.md`
+  （3フェーズ: ①iPhone動画オフライン→②C270ライブ＋run_batch統合→③広角カメラ・
+  UDPブリッジ・自動原点復帰の一括許可ループ。アーキテクチャは案A=ラップトップ集中）。
+- **Phase 1 実装完了**（subagent-driven・計画書
+  `docs/superpowers/plans/2026-07-16-camera-truth-phase1.md`、base bd68aea）:
+  - `rover/truth_core.py`: AprilTag(tag36h11, cv2.aruco)検出 → 床タグ4枚中心の
+    solvePnP でカメラ外部姿勢 → **光線×平面z=hの交点で視差補正つきロボットpose**。
+    合成画像テストで位置≤1cm・角度≤0.02rad を担保（`tests/synth_scene.py`）。
+  - `rover/truth_offline.py`: 俯瞰動画→(t,x,y,θ)CSV＋終点サマリ。2パス
+    （床タグ平均でキャリブ→全フレームpose化）、末尾でカメラずれ1cm超を警告。
+  - `rover/calibrate_camera.py`: チェスボード動画→K/dist（yaml貼り付け出力）。
+  - `rover/make_tags.py` → `docs/tags/` に印刷用PNG5枚生成済み。
+  - テスト: `uv run pytest tests/` 36本全pass。
+- 実装中に計画の数値問題を2件修正（教訓・計画書にも反映済み）:
+  - solvePnP は **IPPEだと正対面付近で0.5px画素ノイズが6cmに増幅** → ITERATIVE
+    （誤差2.7mm）に変更。
+  - キャリブ合成テストは正対ビューだけだと焦点距離が縮退（fx誤差2.7%・k3暴走）
+    → ビュー多様性強化＋CALIB_FIX_K3（fx誤差0.2%）。
+- 次: **実写の静置照合**（手順書 `docs/作業記録/カメラ真値_精度検証手順.md`。
+  タグ・チェスボード印刷 → iPhoneキャリブ → 既知5点で±1〜2cm確認 → 真値認定）
+  → Phase 2（usbipd＋C270ライブ化・run_batch統合）。
 
 ## 2026-07-15 セッション12（実機L字バッチ＝実施完了・チャタ対策を実機で立証）
 

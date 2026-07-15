@@ -80,8 +80,16 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
     （1〜10°）。全走行コーナー外側へ流れる＝odom不可視の滑り → カメラ真値が本筋
   - 運用メモ: nav_base起動は `~/ros2_ws/install/setup.bash` の追いsource必須。
     odometryノード実名は `wrc201_odometry`（preflight修正済み）
-- 次: 外乱条件バッチの設計 → カメラ真値パイプライン（AprilTag俯瞰）→
-  中間発表ストーリー整理（問題→原因→対策→実機立証）
+- カメラ真値パイプライン Phase 1: **実装完了（2026-07-16）** →
+  `rover/truth_core.py`（AprilTag→solvePnP→視差補正pose）, `rover/truth_offline.py`
+  （俯瞰動画→CSV）, `rover/calibrate_camera.py`, `rover/make_tags.py`
+  - 設計: `docs/superpowers/specs/2026-07-16-camera-truth-pipeline-design.md`
+    （3フェーズ: iPhone後処理→C270ライブ→広角＋UDPブリッジ＋自動原点復帰）
+  - 合成画像テストで位置≤1cm/角度≤0.02radを担保。PnPはITERATIVE
+    （IPPEはノイズ増幅）、キャリブはCALIB_FIX_K3。テスト36本 `uv run pytest tests/`
+- 次: カメラ真値Phase 1の静置照合（手順: docs/作業記録/カメラ真値_精度検証手順.md）
+  → Phase 2（C270ライブ化・run_batch統合）→ Phase 3（広角カメラ・自動原点復帰）。
+  外乱条件バッチはカメラ真値の後 → 中間発表ストーリー整理（問題→原因→対策→実機立証）
 
 ## 環境変更（2026-07-05）
 
