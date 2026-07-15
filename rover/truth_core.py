@@ -39,3 +39,31 @@ def detect_tags(gray, detector):
 
 def tag_center(corners):
     return corners.mean(axis=0)
+
+
+def solve_camera_pose(floor_tags, detections, K, dist):
+    """床基準タグ中心（コース座標z=0）と検出中心から solvePnP。
+
+    floor_tags: {id: (x_m, y_m)}。検出できた共通タグが4枚未満なら CalibError。
+    返り値 (rvec, tvec): コース座標→カメラ座標の剛体変換。
+    中心のみ使う（タグの向き・印刷サイズの実測が不要になるため）。
+    """
+    obj, img = [], []
+    for tid, xy in floor_tags.items():
+        if tid in detections:
+            obj.append([xy[0], xy[1], 0.0])
+            img.append(tag_center(detections[tid]))
+    if len(obj) < 4:
+        raise CalibError(f'床基準タグ検出 {len(obj)}/4 枚（4枚必要）')
+    ok, rvec, tvec = cv2.solvePnP(
+        np.asarray(obj, dtype=np.float64), np.asarray(img, dtype=np.float64),
+        K, dist, flags=cv2.SOLVEPNP_IPPE)
+    if not ok:
+        raise CalibError('solvePnP 失敗')
+    return rvec, tvec
+
+
+def camera_center(rvec, tvec):
+    """カメラ中心のコース座標（設置ズレ検知にも使う）。"""
+    R, _ = cv2.Rodrigues(rvec)
+    return (-R.T @ np.asarray(tvec).reshape(3, 1)).flatten()
