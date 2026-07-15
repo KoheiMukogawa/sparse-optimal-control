@@ -109,7 +109,8 @@ run_one開始 → truth_live.start(outdir/truth_<cond>_r<rep>.csv)
 
 ## 依存
 
-- laptop: `uv add opencv-python pupil-apriltags`
+- laptop: `uv add opencv-python`（AprilTagの検出・印刷用画像生成とも cv2.aruco
+  の DICT_APRILTAG_36h11 を使用。pupil-apriltags は不要と判明＝依存1つ減）
 - RPi: 追加なし（ブリッジは stdlib＋rclpy）
 
 ## 機材・準備物

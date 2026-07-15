@@ -1,0 +1,18 @@
+# カメラ真値計測の設定（設計: specs/2026-07-16-camera-truth-pipeline-design.md）
+# K / dist は rover/calibrate_camera.py の出力を貼り付ける。
+# floor_tags はタグ中心の実測コース座標 [m]（原点=走行原点, x=第1直進方向）。
+# タグの印刷サイズ精度は不要（中心と光線交点のみ使用。サイズは検出可否にだけ効く）。
+camera:
+  name: iphone_main_1080p   # 使用カメラ・モードを記録（レンズ切替时は要再キャリブ）
+  image_size: [1920, 1080]
+  K: null        # 3x3 リスト。null のままだと load_config がエラーを出す
+  dist: null     # [k1, k2, p1, p2, k3]
+floor_tags:      # id: [x_m, y_m]。4枚とも実測して記入
+  0: null        # 例: [-0.20, -0.20]
+  1: null
+  2: null
+  3: null
+robot_tag:
+  id: 10
+  z_m: 0.13            # 床→タグ面の高さ（実測して更新）
+  yaw_offset_rad: 0.0  # タグ正準+x と機体前方のズレ
