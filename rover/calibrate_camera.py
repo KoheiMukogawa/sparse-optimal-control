@@ -33,9 +33,24 @@ def calibrate(grays, cols=9, rows=6, square_m=0.024):
         raise ValueError(f'チェスボード検出 {len(obj_pts)} 枚（3枚以上必要）')
     # k3は固定（通常画角では不要で、ビュー多様性が足りないと暴走する。
     # 広角カメラ導入時にk3が要るなら再検討）
-    err, K, dist, _, _ = cv2.calibrateCamera(obj_pts, img_pts, size,
-                                             None, None,
-                                             flags=cv2.CALIB_FIX_K3)
+    err, K, dist, rvecs, tvecs = cv2.calibrateCamera(
+        obj_pts, img_pts, size, None, None, flags=cv2.CALIB_FIX_K3)
+    # 移動中のブレフレームはコーナーが数px流れて全体を汚す
+    # （実写で1.49px→除去後0.27pxを確認）。ビュー別再投影誤差で除いて再推定。
+    for _ in range(3):
+        per = []
+        for o, c, rv, tv in zip(obj_pts, img_pts, rvecs, tvecs):
+            proj, _ = cv2.projectPoints(o, rv, tv, K, dist)
+            per.append(float(np.sqrt(np.mean(
+                (proj.reshape(-1, 2) - c.reshape(-1, 2)) ** 2))))
+        thr = max(0.5, 1.4 * float(np.median(per)))
+        keep = [i for i, e in enumerate(per) if e < thr]
+        if len(keep) == len(obj_pts) or len(keep) < 3:
+            break
+        obj_pts = [obj_pts[i] for i in keep]
+        img_pts = [img_pts[i] for i in keep]
+        err, K, dist, rvecs, tvecs = cv2.calibrateCamera(
+            obj_pts, img_pts, size, None, None, flags=cv2.CALIB_FIX_K3)
     return K, dist.flatten()[:5], err
 
 
