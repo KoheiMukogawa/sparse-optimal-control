@@ -515,8 +515,12 @@ def _board_img(cols=9, rows=6, sq=60, margin=80):
                               margin, margin, cv2.BORDER_CONSTANT, value=255)
 
 
-def _render_views(n=8, cols=9, rows=6, sq=60, margin=80):
-    """ボードを複数姿勢で射影した合成ビュー群（歪みゼロ・K_TEST）。"""
+def _render_views(n=12, cols=9, rows=6, sq=60, margin=80):
+    """ボードを複数姿勢で射影した合成ビュー群（歪みゼロ・K_TEST）。
+
+    回転±0.5rad・並進±0.06m のばらつきが必要（正対に近いビューだけだと
+    焦点距離と距離が縮退して fx が2%超ずれる。実測: ±0.3では719、±0.5で701.4）。
+    """
     board = _board_img(cols, rows, sq, margin)
     h, w = board.shape
     # ビットマップ四隅の3D座標: 1マス=0.024m とし、余白も同スケールで換算
@@ -529,8 +533,8 @@ def _render_views(n=8, cols=9, rows=6, sq=60, margin=80):
     rng = np.random.default_rng(0)
     views = []
     for _ in range(n):
-        rvec = rng.uniform(-0.3, 0.3, 3) + np.array([np.pi, 0, 0])
-        tvec = np.array([[0.05], [0.1], [0.9]]) + rng.uniform(-0.03, 0.03, (3, 1))
+        rvec = rng.uniform(-0.5, 0.5, 3) + np.array([np.pi, 0, 0])
+        tvec = np.array([[0.05], [0.1], [0.9]]) + rng.uniform(-0.06, 0.06, (3, 1))
         # ボード原点をカメラ正面に置く: コース系は使わず board系→cam 直指定
         proj, _ = cv2.projectPoints(obj4, rvec, tvec, K_TEST, DIST0)
         H = cv2.getPerspectiveTransform(src, proj.reshape(4, 2).astype(np.float32))
@@ -598,8 +602,11 @@ def calibrate(grays, cols=9, rows=6, square_m=0.024):
         img_pts.append(corners)
     if len(obj_pts) < 3:
         raise ValueError(f'チェスボード検出 {len(obj_pts)} 枚（3枚以上必要）')
+    # k3は固定（通常画角では不要で、ビュー多様性が足りないと暴走する。
+    # 広角カメラ導入時にk3が要るなら再検討）
     err, K, dist, _, _ = cv2.calibrateCamera(obj_pts, img_pts, size,
-                                             None, None)
+                                             None, None,
+                                             flags=cv2.CALIB_FIX_K3)
     return K, dist.flatten()[:5], err
 
 
