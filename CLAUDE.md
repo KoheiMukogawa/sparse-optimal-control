@@ -34,7 +34,7 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 
 - 日本語で簡潔に（例: `MPCの雛形実装`, `L1正則化を追加`）
 
-## 現在地（2026-07-14時点）
+## 現在地（2026-07-15時点）
 
 - 実現可能性ゲート（RPi求解時間ベンチ）: **通過** → `results/2026-06-13_rpi_bench/`
   - L2/L1 とも N=30 まで 0.1s 周期内（L2 p95≈18ms, L1 p95≈29ms）、低電圧なし
@@ -69,8 +69,17 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
   `rover/exp_backends.py`, `rover/exp_metrics.py`, `configs/batch_Lturn_3way.yaml`
   - sim E2E で L1チャタ→ms=2.0で消失の既知結果を再現。実機は `--backend real`
     （1本ごと Enter待ち＝許可、`--dry-run` で手順確認可）。テストは `uv run pytest tests/`
-- 次: バッチランナーで実機 L字バッチ（Kanayama/L2/L1/L1+ms2.0 ×3本、要許可・
-  初回が統合テスト）→ チャタ消失の実測確認と統計化 → 外乱条件 / カメラ真値
+- 実機L字バッチ（4条件×3本）: **実施完了（2026-07-15）** →
+  `results/2026-07-15_Lturn_3way_real/`, `results/2026-07-15_Lturn_batch_compare.md`
+  - **12/12到達。L1チャタが move_suppress=2.0 で消失を実機で統計確認**
+    （反転18±0→1±0、Σ|u|19.2→5.02、ω0率0.88維持）＝「問題→原因→対策」を実機で閉じた
+  - sim基準（遅延2step）が実機を定量予測（全条件差≈10%以内、l1_ms2はほぼ一致）
+  - 追従序列: l2 1.83 < l1_ms2 2.20 < l1 3.49 < kanayama 11.26 cm（odom基準）。
+    外部計測（真値）は未取得＝l2 vs l1_ms2 の物理序列は未確定
+  - 運用メモ: nav_base起動は `~/ros2_ws/install/setup.bash` の追いsource必須。
+    odometryノード実名は `wrc201_odometry`（preflight修正済み）
+- 次: 外乱条件バッチの設計 → カメラ真値パイプライン（AprilTag俯瞰）→
+  中間発表ストーリー整理（問題→原因→対策→実機立証）
 
 ## 環境変更（2026-07-05）
 

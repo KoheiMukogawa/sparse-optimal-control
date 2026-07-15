@@ -1,4 +1,30 @@
-# Handoff - 2026-07-14
+# Handoff - 2026-07-15
+
+## 2026-07-15 セッション12（実機L字バッチ＝実施完了・チャタ対策を実機で立証）
+
+- **バッチランナー初の実機走行＝12/12到達**（Kanayama/L2/L1/L1+ms2.0 ×3本、
+  ユーザー許可・1本ごとEnter）。結果: `results/2026-07-15_Lturn_3way_real/`、
+  比較レポート: `results/2026-07-15_Lturn_batch_compare.md`。
+- **主結果（n=3, odom基準）**: ナイーブL1のチャタ（反転18±0・Σ|u|19.2・飽和37%）が
+  **move_suppress=2.0 で反転1±0・Σ|u|5.02 に消失**、ω0率0.88とスパース性は最良。
+  追従は l2 1.83 < l1_ms2 2.20 < l1 3.49 < kanayama 11.26 cm。総合最良は依然L2だが
+  l1_ms2が僅差。**「問題→原因→対策」を実機で閉じた**。
+- **sim基準（遅延2step）が実機を定量予測**: 全条件で差≈10%以内、l1_ms2は
+  Σ|u| 5.02 vs 5.01・反転 1 vs 1 とほぼ一致。遅延起因説の裏付けが統計でも成立。
+- 計算負荷: p95 l2 21 / l1_ms2 31 / l1 38 ms（全て0.1s周期内、6/13より軽い）。
+- 統合テストでの発見・修正:
+  - nav_base 起動は `~/ros2_ws/install/setup.bash` の追いsourceが必要
+    （/opt/ros/humbleのみでは `lightrover_ros` not found）。
+  - preflight のodometryノード名チェックを実名 `wrc201_odometry` に修正
+    （`odom_manager` は存在しない。旧名も許容）。テスト24本pass。
+  - `--dry-run` でも runs.csv に行が追記される（本番前に削除が必要）。要改善候補。
+- **未取得: 外部計測（真値）**。external.md はテンプレのまま未記入
+  （走行ペースが速く記入が追いつかず）。odomは滑りを見られないため
+  l2 vs l1_ms2 の物理序列は未確定。次回は走行ごと記入 or カメラ真値を先に。
+- **未処理**: nav_base はRPiで起動したまま（停止判断はユーザー）。
+  停止例: `ssh mukougawakouhei@192.168.0.32 "pkill -INT -f nav_base; pkill -INT -f ros2"`
+- 次: 外乱条件バッチ（重り/低摩擦/横押し等の条件設計）→ カメラ真値パイプライン
+  （AprilTag俯瞰、S8計画）→ 中間発表へ「問題→原因→対策→実機立証」ストーリー整理。
 
 > **リポジトリ整理（2026-06-13）**: ブランチを **`main` 一本に集約**（旧 `master`・
 > `exp/autonomous-drive` は削除、全履歴は main に保存）。`README.md`・`results/README.md`

@@ -244,7 +244,11 @@ class RealBackend:
 
         nodes = self._ssh('source /opt/ros/humble/setup.bash 2>/dev/null; '
                           'ros2 node list').stdout
-        if 'pos_controller' not in nodes or 'odom_manager' not in nodes:
+        # odometryノードの実名は wrc201_odometry（実機確認2026-07-15）。
+        # 旧名 odom_manager も許容しておく。
+        if ('pos_controller' not in nodes
+                or not any(n in nodes for n in ('wrc201_odometry',
+                                                'odom_manager'))):
             raise RuntimeError(
                 'nav_base が稼働していません。RPiで先に起動してください:\n'
                 '  ros2 launch lightrover_ros nav_base.launch.py')
