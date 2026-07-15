@@ -49,6 +49,19 @@ def test_solve_camera_pose_recovers_camera_center():
     assert np.allclose(camera_center(rv, tv), [0.75, 0.75, 2.4], atol=0.02)
 
 
+def test_solve_camera_pose_rejects_collinear_tags():
+    """床タグ4枚が一直線だと退化 → 分かるメッセージの CalibError。"""
+    line_tags = {0: (-0.2, -0.2), 1: (0.4, -0.2), 2: (1.0, -0.2),
+                 3: (1.7, -0.2)}
+    rvec, tvec = look_down_pose()
+    tags = [(tid, tag_corners3d(xy, 0.15, yaw=0.1 * tid))
+            for tid, xy in line_tags.items()]
+    img = render_scene((1280, 720), K_TEST, DIST0, rvec, tvec, tags)
+    det = detect_tags(img, make_detector())
+    with pytest.raises(CalibError, match='一直線'):
+        solve_camera_pose(line_tags, det, K_TEST, DIST0)
+
+
 def test_solve_camera_pose_needs_4_tags():
     """3枚しか写らないと CalibError。"""
     import pytest
