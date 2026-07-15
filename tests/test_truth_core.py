@@ -58,3 +58,39 @@ def test_solve_camera_pose_needs_4_tags():
     det.pop(0)
     with pytest.raises(CalibError):
         solve_camera_pose(FLOOR_TAGS, det, K_TEST, DIST0)
+
+
+def _full_scene(robot_xy, robot_yaw, z=0.13):
+    """床タグ4枚＋ロボットタグ(id10, 12cm, 高さz)のシーンと真のカメラ姿勢。"""
+    rvec, tvec = look_down_pose()
+    tags = [(tid, tag_corners3d(xy, 0.15, yaw=0.1 * tid))
+            for tid, xy in FLOOR_TAGS.items()]
+    tags.append((10, tag_corners3d(robot_xy, 0.12, yaw=robot_yaw, z=z)))
+    img = render_scene((1280, 720), K_TEST, DIST0, rvec, tvec, tags)
+    return img, rvec, tvec
+
+
+def test_robot_pose_accuracy():
+    """コース中央と端の複数姿勢で 位置≤1cm・角度≤0.02rad。"""
+    from truth_core import robot_pose, solve_camera_pose
+    cases = [((0.75, 0.75), 0.0), ((1.50, 0.20), 2.0), ((0.10, 1.40), -2.5)]
+    for xy, yaw in cases:
+        img, _, _ = _full_scene(xy, yaw)
+        det = detect_tags(img, make_detector())
+        rv, tv = solve_camera_pose(FLOOR_TAGS, det, K_TEST, DIST0)
+        x, y, th = robot_pose(det[10], K_TEST, DIST0, rv, tv, 0.13)
+        assert np.hypot(x - xy[0], y - xy[1]) < 0.01, (xy, yaw)
+        dth = (th - yaw + np.pi) % (2 * np.pi) - np.pi
+        assert abs(dth) < 0.02, (xy, yaw)
+
+
+def test_parallax_correction_is_necessary():
+    """z=0 のホモグラフィ扱いだとコース端で3cm超ズレる（補正の必要性の担保）。"""
+    from truth_core import pixel_to_plane, solve_camera_pose, tag_center
+    img, _, _ = _full_scene((1.50, 0.20), 0.0)
+    det = detect_tags(img, make_detector())
+    rv, tv = solve_camera_pose(FLOOR_TAGS, det, K_TEST, DIST0)
+    c_px = tag_center(det[10])
+    p_ok = pixel_to_plane(c_px, K_TEST, DIST0, rv, tv, 0.13)
+    p_naive = pixel_to_plane(c_px, K_TEST, DIST0, rv, tv, 0.0)
+    assert np.linalg.norm(p_ok - p_naive) > 0.03

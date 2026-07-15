@@ -69,3 +69,35 @@ def camera_center(rvec, tvec):
     """カメラ中心のコース座標（設置ズレ検知にも使う）。"""
     R, _ = cv2.Rodrigues(rvec)
     return (-R.T @ np.asarray(tvec).reshape(3, 1)).flatten()
+
+
+def pixel_to_plane(pt, K, dist, rvec, tvec, z):
+    """画素座標 pt を高さ z[m] の水平面へ逆投影（光線と平面の交点）。
+
+    ロボット上面タグは床から z_m 浮いているため、床ホモグラフィだと
+    コース端で数cmの視差誤差が出る。カメラ姿勢既知なので厳密に解く。
+    """
+    xn = cv2.undistortPoints(
+        np.asarray(pt, dtype=np.float64).reshape(1, 1, 2), K, dist)[0, 0]
+    R, _ = cv2.Rodrigues(rvec)
+    cam = (-R.T @ np.asarray(tvec).reshape(3, 1)).flatten()
+    ray = R.T @ np.array([xn[0], xn[1], 1.0])
+    s = (z - cam[2]) / ray[2]
+    return (cam + s * ray)[:2]
+
+
+def robot_pose(corners, K, dist, rvec, tvec, z, yaw_offset=0.0):
+    """ロボット上面タグ corners → (x, y, theta) コース座標。
+
+    θ はタグ正準+x方向（左辺中点→右辺中点）を平面 z へ投影して算出し、
+    yaw_offset（タグ+xと機体前方のズレ）を差し引く。θは[-π,π]。
+    """
+    c = pixel_to_plane(tag_center(corners), K, dist, rvec, tvec, z)
+    left = pixel_to_plane((corners[0] + corners[3]) / 2,
+                          K, dist, rvec, tvec, z)
+    right = pixel_to_plane((corners[1] + corners[2]) / 2,
+                           K, dist, rvec, tvec, z)
+    d = right - left
+    theta = np.arctan2(d[1], d[0]) - yaw_offset
+    theta = (theta + np.pi) % (2 * np.pi) - np.pi
+    return float(c[0]), float(c[1]), float(theta)
