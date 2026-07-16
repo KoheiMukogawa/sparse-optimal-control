@@ -16,8 +16,14 @@
   - `rover/run_batch.py --auto`: 一括許可→走行→truth_*.csv→復帰→次走行。
     q+Enter即停止・連続2失敗停止・truth_end_*/truth_rmse_cm 列追加
   - テストは全て fake/合成画像（実カメラ・実ソケット不使用）で全green
+- **最終レビュー（fable・sim追試90本つき）: Important 2件を 0b34e81 で修正して Ready**:
+  ①初回走行失敗時に outdir 未作成で truth CSV 書き込みがバッチ全体を落とす穴
+  ②--resume/--only が --auto で黙って無視（済み走行の再走・意図しない実機走行）。
+  ＋ _prompt の誤入力ドレイン・CameraSource を MJPG＋バッファ1（usbipd遅延対策）。
+  テスト56本全green。homing はsim90本（遅延0.3s・loss10%込み）で全収束を追試済み。
 - **実機E2Eは未実施**: usbipd で C270 を WSL に attach（ユーザー作業）→
-  手順: docs/作業記録/全自動バッチ運用手順.md の「初回実機E2E」節。
+  手順: docs/作業記録/全自動バッチ運用手順.md の「初回実機E2E」節（トラブル
+  シュート節も参照）。RPi は本日シャットダウン済み。
 - 運用注意: nav_base の多重起動事故あり（同名ノード3重でモータ指令競合の恐れ→
   全kill→1つだけ起動で復旧）。ブリッジはlaptop側再起動時にRPi側も再起動（seq巻き戻り対策）。
 
