@@ -260,12 +260,12 @@ def main():
         print(f'summary.md を再生成: {outdir}')
         return
 
+    if args.auto and backend_kind != 'real':
+        raise SystemExit('--auto は --backend real 専用です')
     if backend_kind == 'sim':
         backend = SimBackend(batch)
     else:
         from exp_backends import RealBackend
-        if args.auto and backend_kind != 'real':
-            raise SystemExit('--auto は --backend real 専用です')
         stop_event = threading.Event()
         backend = RealBackend(batch, dry_run=args.dry_run,
                               auto=args.auto, stop_event=stop_event)
@@ -295,26 +295,30 @@ def main():
         truth = TruthLive(cfg, CameraSource(live.get('device', 0),
                                             live.get('width', 1280),
                                             live.get('height', 720)))
-        print('カメラ姿勢をキャリブレーション中（床タグ4枚が写ること）...')
-        truth.calibrate()
-        bridge_ok = backend._ssh(
-            "pgrep -f '[u]dp_twist_bridge'").stdout.strip()
-        if not bridge_ok:
-            raise SystemExit(
-                'RPiで udp_twist_bridge が起動していません:\n'
-                '  source /opt/ros/humble/setup.bash && '
-                f'python3 {RPI_BRIDGE} --port '
-                f"{cfg.get('udp', {}).get('port', 8890)}")
-        sender = UdpTwistSender(backend.host,
-                                cfg.get('udp', {}).get('port', 8890))
-        line_q = queue.Queue()
-        _start_stdin_listener(stop_event, line_q)
+        # calibrate失敗やブリッジ未起動でもカメラを確実に解放する
+        # （usbipd越しのWSL2カメラは掴んだままになりやすい）
+        sender = None
         try:
+            print('カメラ姿勢をキャリブレーション中（床タグ4枚が写ること）...')
+            truth.calibrate()
+            bridge_ok = backend._ssh(
+                "pgrep -f '[u]dp_twist_bridge'").stdout.strip()
+            if not bridge_ok:
+                raise SystemExit(
+                    'RPiで udp_twist_bridge が起動していません:\n'
+                    '  source /opt/ros/humble/setup.bash && '
+                    f'python3 {RPI_BRIDGE} --port '
+                    f"{cfg.get('udp', {}).get('port', 8890)}")
+            sender = UdpTwistSender(backend.host,
+                                    cfg.get('udp', {}).get('port', 8890))
+            line_q = queue.Queue()
+            _start_stdin_listener(stop_event, line_q)
             auto_batch(batch, backend, truth, sender, cfg, outdir,
                        csv_path, ghash, v_r, stop_event,
                        input_fn=lambda p: _prompt(p, line_q, stop_event))
         finally:
-            sender.close()
+            if sender is not None:
+                sender.close()
             truth.close()
         if csv_path.exists():
             write_summary(outdir)

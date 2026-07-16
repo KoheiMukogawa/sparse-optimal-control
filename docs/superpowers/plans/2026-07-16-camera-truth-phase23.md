@@ -1107,12 +1107,14 @@ CSV_COLUMNS = [
     ap.add_argument('--camera-config', default='configs/camera_truth.yaml')
 ```
 
-sim分岐の直後に:
+`if backend_kind == 'sim':` の分岐より**前**（backend選択の直前）に:
 
 ```python
     if args.auto and backend_kind != 'real':
         raise SystemExit('--auto は --backend real 専用です')
 ```
+
+（else側にネストするとyaml既定のsimで発火しない＝レビューで検出済みの罠）
 
 RealBackend 生成を次に変更（stop_event を先に作る）:
 
