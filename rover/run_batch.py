@@ -119,6 +119,12 @@ def _start_stdin_listener(stop_event, line_q):
 
 
 def _prompt(prompt, line_q, stop_event):
+    # 走行中に誤って打たれた行が後のプロンプトを食い潰さないよう先に捨てる
+    while True:
+        try:
+            line_q.get_nowait()
+        except queue.Empty:
+            break
     print(prompt, end='', flush=True)
     while not stop_event.is_set():
         try:
@@ -129,20 +135,26 @@ def _prompt(prompt, line_q, stop_event):
 
 
 def auto_batch(batch, backend, truth, sender, cfg, outdir, csv_path,
-               ghash, v_r, stop_event, homing_fn=None, input_fn=input):
+               ghash, v_r, stop_event, homing_fn=None, input_fn=input,
+               done=(), only=None):
     """--auto のループ本体: 走行→真値stop→CSV→原点復帰→次へ。
 
     homing_fn / input_fn はテストで差し替える。復帰は「次の走行がある」
     ときだけ行う。復帰失敗はリトライ1回→それでも駄目なら人にEnterを求める。
-    連続2本の走行失敗でループ停止（spec）。
+    連続2本の走行失敗でループ停止（spec）。done/only は --resume/--only 用。
     """
     from exp_backends import load_path
     from exp_metrics import truth_metrics
     if homing_fn is None:
         from homing import home as homing_fn
+    # 初回走行が失敗すると bag 回収前に truth CSV を書く＝outdir が無いと
+    # ここで落ちてバッチ全体が止まる（設計契約「1本の失敗は止めない」違反）
+    Path(outdir).mkdir(parents=True, exist_ok=True)
     waypoints, _ = load_path(batch['path_file'])
     runs = [(c, r) for c in batch['conditions']
-            for r in range(1, int(batch['repeats']) + 1)]
+            for r in range(1, int(batch['repeats']) + 1)
+            if (only is None or c['name'] == only)
+            and (c['name'], r) not in set(done)]
     fails = 0
     for i, (cond, rep) in enumerate(runs):
         if stop_event.is_set():
@@ -315,7 +327,8 @@ def main():
             _start_stdin_listener(stop_event, line_q)
             auto_batch(batch, backend, truth, sender, cfg, outdir,
                        csv_path, ghash, v_r, stop_event,
-                       input_fn=lambda p: _prompt(p, line_q, stop_event))
+                       input_fn=lambda p: _prompt(p, line_q, stop_event),
+                       done=done, only=args.only)
         finally:
             if sender is not None:
                 sender.close()

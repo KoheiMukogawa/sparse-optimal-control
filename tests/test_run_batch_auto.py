@@ -34,6 +34,8 @@ class FakeTruth:
         self.started.append(str(path))
 
     def stop(self):
+        # 本物の TruthLive.stop() 同様にCSVを書く（outdir未作成なら落ちる）
+        Path(self.started[-1]).write_text('t_s\n')
         # ゴール到達済みの軌跡もどき（最後の0.5sは(1.0,1.0)付近）
         return [(0.1 * i, 1.0, 1.0, 1.57, 5, 300.0) for i in range(20)]
 
@@ -41,11 +43,13 @@ class FakeTruth:
         return (1.0, 1.0, 1.57)
 
 
-def _run(oks, homing_results, inputs=('',), stop=None):
+def _run(oks, homing_results, inputs=('',), stop=None, done=(), only=None,
+         premake=False):
     tmp = Path('/tmp/claude-autobatch-test')
     import shutil
     shutil.rmtree(tmp, ignore_errors=True)
-    tmp.mkdir(parents=True)
+    if premake:
+        tmp.mkdir(parents=True)
     backend = FakeBackend(oks)
     truth = FakeTruth()
     calls = []
@@ -59,7 +63,8 @@ def _run(oks, homing_results, inputs=('',), stop=None):
     auto_batch(BATCH, backend, truth, sender=None, cfg=CFG, outdir=tmp,
                csv_path=tmp / 'runs.csv', ghash='x', v_r=0.1,
                stop_event=stop or threading.Event(),
-               homing_fn=homing_fn, input_fn=lambda p: next(it))
+               homing_fn=homing_fn, input_fn=lambda p: next(it),
+               done=done, only=only)
     csv_file = tmp / 'runs.csv'
     rows = list(csv.DictReader(open(csv_file))) if csv_file.exists() else []
     return backend, truth, calls, rows
@@ -100,3 +105,35 @@ def test_auto_batch_q_stops_loop():
     backend, _, _, rows = _run(oks=[True, True], homing_results=[],
                                stop=stop)
     assert backend.calls == 0 and rows == []
+
+
+def test_auto_batch_creates_outdir_and_survives_first_run_error():
+    """初回走行がssh例外等で失敗しても outdir 未作成で落ちず ok=False で続行。"""
+    class BoomBackend(FakeBackend):
+        def run_one(self, cond, rep, outdir):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError('ssh timeout')
+            return dict(ok=True, metrics={}, bagdir='', note='')
+
+    tmp = Path('/tmp/claude-autobatch-test')
+    import shutil
+    shutil.rmtree(tmp, ignore_errors=True)   # 事前mkdirしない
+    backend = BoomBackend([])
+    auto_batch(BATCH, backend, FakeTruth(), sender=None, cfg=CFG,
+               outdir=tmp, csv_path=tmp / 'runs.csv', ghash='x', v_r=0.1,
+               stop_event=threading.Event(),
+               homing_fn=lambda *a, **k: dict(ok=True, reason='done'),
+               input_fn=lambda p: '')
+    rows = list(csv.DictReader(open(tmp / 'runs.csv')))
+    assert backend.calls == 2 and len(rows) == 2
+    assert rows[0]['ok'] == 'False' and 'ssh timeout' in rows[0]['note']
+    assert rows[1]['ok'] == 'True'
+
+
+def test_auto_batch_respects_resume_done_and_only():
+    backend, _, _, rows = _run(oks=[True], homing_results=[],
+                               done={('l2', 1)})
+    assert backend.calls == 1 and rows[0]['rep'] == '2'   # rep1はskip
+    backend, _, _, rows = _run(oks=[], homing_results=[], only='kanayama')
+    assert backend.calls == 0 and rows == []              # 条件名不一致は走らない

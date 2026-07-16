@@ -23,6 +23,10 @@ class CameraSource:
 
     def __init__(self, device=0, width=1280, height=720):
         self.cap = cv2.VideoCapture(int(device))
+        # C270はYUYVだと720pで~10fpsに落ち、V4L2バッファ滞留で0.2-0.4sの
+        # 遅延が乗る（homingのALIGN精度に効く）→ MJPG＋バッファ1に固定
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(width))
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(height))
         if not self.cap.isOpened():
