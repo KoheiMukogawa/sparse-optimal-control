@@ -490,6 +490,8 @@ KAN_GAINS = dict(k_x=0.5, k_y=5.0, k_th=3.0)   # exp_backends と同値
 K_TURN = 3.0                    # その場旋回の比例ゲイン
 TURN_ENTER = math.radians(45)   # これ以下の向き誤差で GO へ
 LOOKAHEAD = 0.15
+NEAR_R = 0.10                   # この距離からは点収束則（後退許可）に切替
+K_NEAR_V, K_NEAR_W = 0.5, 2.0
 
 
 def course_bounds(floor_tags, margin=MARGIN_M):
@@ -541,6 +543,17 @@ class HomingController:
                 return 0.0, clamp(K_TURN * err, W_MAX), 'run'
             self.phase = 'GO'
         if self.phase == 'GO':
+            if dist < NEAR_R:
+                # Kanayama は「行き過ぎ」で前進FFと引き戻しが釣り合い
+                # 平衡点ができる（simで4.8cm停滞を確認）→ 後退を許す
+                # go-to-point 則で点収束させる
+                err = normalize_angle(math.atan2(ty - y, tx - x) - th)
+                sign = 1.0
+                if abs(err) > math.pi / 2:
+                    err = normalize_angle(err + math.pi)
+                    sign = -1.0
+                return (clamp(sign * K_NEAR_V * dist, V_HOME),
+                        clamp(K_NEAR_W * err, W_MAX), 'run')
             x_r, y_r, th_r = reference_pose([self.start_xy, (tx, ty)],
                                             x, y, LOOKAHEAD)
             x_e, y_e, th_e = tracking_error(x, y, th, x_r, y_r, th_r)
