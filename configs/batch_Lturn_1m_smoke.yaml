@@ -1,0 +1,12 @@
+# 1m L字スモーク（カメラ真値パイプラインの初E2E確認用・2026-07-16）
+# 実行例: uv run python rover/run_batch.py configs/batch_Lturn_1m_smoke.yaml \
+#           --backend real --outdir results/2026-07-16_Lturn_1m_smoke
+name: Lturn_1m_smoke
+path_file: configs/path_L_turn_1m.yaml
+backend: sim
+repeats: 1
+timeout_s: 60
+common: {horizon: 15, rate: 10.0}
+sim: {delay_steps: 2, pos_noise: 0.0, yaw_noise: 0.0}
+conditions:
+  - {name: l2, controller: l2}
