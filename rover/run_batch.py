@@ -16,8 +16,11 @@ import argparse
 import csv
 import datetime
 import math
+import queue
 import statistics
 import subprocess
+import sys
+import threading
 from pathlib import Path
 
 import yaml
@@ -26,7 +29,10 @@ CSV_COLUMNS = [
     'batch', 'cond', 'rep', 'backend', 'timestamp', 'git_hash',
     'controller', 'lam', 'move_suppress', 'horizon', 'v_r', 'ok',
     'drive_s', 'rmse_cm', 'sum_u', 'w_zero_ratio', 'flips', 'sat_ratio',
-    'max_w', 'solve_p50', 'solve_p95', 'solve_max', 'bagdir', 'note',
+    'max_w', 'solve_p50', 'solve_p95', 'solve_max',
+    'truth_end_x', 'truth_end_y', 'truth_end_theta',
+    'truth_end_dist_cm', 'truth_rmse_cm',
+    'bagdir', 'note',
 ]
 
 CONTROLLERS = ('kanayama', 'l2', 'l1')
@@ -99,6 +105,80 @@ def make_row(batch, cond, rep, backend_name, result, git_hash, v_r):
     return row
 
 
+def _start_stdin_listener(stop_event, line_q):
+    """qでstop_event、その他の行はline_qへ（auto中のEnter待ちに使う）。"""
+    def _listen():
+        for line in sys.stdin:
+            s = line.strip().lower()
+            if s == 'q':
+                stop_event.set()
+                print('q受信: 停止します（走行中なら現走行の停止後）')
+                break
+            line_q.put(s)
+    threading.Thread(target=_listen, daemon=True).start()
+
+
+def _prompt(prompt, line_q, stop_event):
+    print(prompt, end='', flush=True)
+    while not stop_event.is_set():
+        try:
+            return line_q.get(timeout=0.2)
+        except queue.Empty:
+            continue
+    return 'q'
+
+
+def auto_batch(batch, backend, truth, sender, cfg, outdir, csv_path,
+               ghash, v_r, stop_event, homing_fn=None, input_fn=input):
+    """--auto のループ本体: 走行→真値stop→CSV→原点復帰→次へ。
+
+    homing_fn / input_fn はテストで差し替える。復帰は「次の走行がある」
+    ときだけ行う。復帰失敗はリトライ1回→それでも駄目なら人にEnterを求める。
+    連続2本の走行失敗でループ停止（spec）。
+    """
+    from exp_backends import load_path
+    from exp_metrics import truth_metrics
+    if homing_fn is None:
+        from homing import home as homing_fn
+    waypoints, _ = load_path(batch['path_file'])
+    runs = [(c, r) for c in batch['conditions']
+            for r in range(1, int(batch['repeats']) + 1)]
+    fails = 0
+    for i, (cond, rep) in enumerate(runs):
+        if stop_event.is_set():
+            print('停止要求によりループ終了')
+            break
+        truth.start(Path(outdir) / f"truth_{cond['name']}_r{rep}.csv")
+        try:
+            result = backend.run_one(cond, rep, outdir)
+        except Exception as e:
+            result = dict(ok=False, metrics={}, bagdir='', note=f'error: {e}')
+        rows = truth.stop()
+        tm = truth_metrics(rows, waypoints)
+        row = make_row(batch, cond, rep, backend.name, result, ghash, v_r)
+        row.update({k: f'{v:.4f}' for k, v in tm.items()})
+        append_row(csv_path, row)
+        print(f"{cond['name']} rep{rep}: ok={result['ok']} "
+              f"truth_end={tm.get('truth_end_dist_cm', float('nan')):.1f}cm")
+        fails = 0 if result['ok'] else fails + 1
+        if fails >= 2:
+            print('連続2本失敗: ループを停止します（状態を確認して再開）')
+            break
+        if i == len(runs) - 1 or stop_event.is_set():
+            break
+        hres = homing_fn(lambda: truth.pose(1.0), sender,
+                         cfg['floor_tags'], stop_event=stop_event)
+        if not hres['ok'] and not stop_event.is_set():
+            print(f"復帰失敗({hres['reason']}) → リトライ")
+            hres = homing_fn(lambda: truth.pose(1.0), sender,
+                             cfg['floor_tags'], stop_event=stop_event)
+        if not hres['ok'] and not stop_event.is_set():
+            ans = input_fn(f"復帰失敗({hres['reason']})。手で原点に戻して "
+                           'Enter（qで中断）: ')
+            if ans.strip().lower() == 'q':
+                break
+
+
 def git_hash_short():
     try:
         return subprocess.run(['git', 'rev-parse', '--short', 'HEAD'],
@@ -162,6 +242,9 @@ def main():
     ap.add_argument('--summarize', action='store_true',
                     help='走行せず summary.md のみ再生成')
     ap.add_argument('--outdir', help='出力先（既定 results/<日付>_<名前>）')
+    ap.add_argument('--auto', action='store_true',
+                    help='実機のみ: 真値記録＋自動原点復帰の全自動ループ')
+    ap.add_argument('--camera-config', default='configs/camera_truth.yaml')
     args = ap.parse_args()
 
     from exp_backends import SimBackend, load_path
@@ -181,10 +264,18 @@ def main():
         backend = SimBackend(batch)
     else:
         from exp_backends import RealBackend
-        backend = RealBackend(batch, dry_run=args.dry_run)
+        if args.auto and backend_kind != 'real':
+            raise SystemExit('--auto は --backend real 専用です')
+        stop_event = threading.Event()
+        backend = RealBackend(batch, dry_run=args.dry_run,
+                              auto=args.auto, stop_event=stop_event)
         if not args.dry_run:
+            n_runs = len(batch['conditions']) * int(batch['repeats'])
+            extra = (f'\n  全{n_runs}本を自動実行（走行→真値→原点復帰）。'
+                     '\n  q+Enter でいつでも停止・有人監視を続けること。'
+                     if args.auto else '')
             ans = input(f"実機バッチ {batch['name']} を開始します。"
-                        f"nav_base 起動済み・走行エリア確保を確認 [y/N]: ")
+                        f"nav_base 起動済み・走行エリア確保を確認{extra} [y/N]: ")
             if ans.strip().lower() != 'y':
                 print('中止しました')
                 return
@@ -193,6 +284,42 @@ def main():
     _, v_r = load_path(batch['path_file'])
     ghash = git_hash_short()
     done = done_keys(csv_path) if args.resume else set()
+
+    if args.auto:
+        from exp_backends import RPI_BRIDGE
+        from homing import UdpTwistSender
+        from truth_live import CameraSource, TruthLive
+        from truth_offline import load_config
+        cfg = load_config(args.camera_config)
+        live = cfg.get('live', {})
+        truth = TruthLive(cfg, CameraSource(live.get('device', 0),
+                                            live.get('width', 1280),
+                                            live.get('height', 720)))
+        print('カメラ姿勢をキャリブレーション中（床タグ4枚が写ること）...')
+        truth.calibrate()
+        bridge_ok = backend._ssh(
+            "pgrep -f '[u]dp_twist_bridge'").stdout.strip()
+        if not bridge_ok:
+            raise SystemExit(
+                'RPiで udp_twist_bridge が起動していません:\n'
+                '  source /opt/ros/humble/setup.bash && '
+                f'python3 {RPI_BRIDGE} --port '
+                f"{cfg.get('udp', {}).get('port', 8890)}")
+        sender = UdpTwistSender(backend.host,
+                                cfg.get('udp', {}).get('port', 8890))
+        line_q = queue.Queue()
+        _start_stdin_listener(stop_event, line_q)
+        try:
+            auto_batch(batch, backend, truth, sender, cfg, outdir,
+                       csv_path, ghash, v_r, stop_event,
+                       input_fn=lambda p: _prompt(p, line_q, stop_event))
+        finally:
+            sender.close()
+            truth.close()
+        if csv_path.exists():
+            write_summary(outdir)
+            print(f'完了: {outdir}/runs.csv, summary.md')
+        return
 
     for cond in batch['conditions']:
         if args.only and cond['name'] != args.only:

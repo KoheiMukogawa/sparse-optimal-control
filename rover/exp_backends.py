@@ -132,6 +132,7 @@ SSH_USER = 'mukougawakouhei'
 # 家Wi-Fi（DHCPで.31→.32に変動歴あり。恒久対策はルーターの固定割当）→ ホットスポットの順
 SSH_HOSTS = ['192.168.0.32', '192.168.0.31', '192.168.4.1']
 RPI_ROOT = '/home/mukougawakouhei/sparse_control'
+RPI_BRIDGE = f'{RPI_ROOT}/rover/udp_twist_bridge.py'
 BAG_TOPICS = '/odom /rover_twist /path_error /mpc_solve_ms'
 SYNC_FILES = ['rover/mpc_follower.py', 'rover/path_follower.py',
               'rover/follower_core.py', 'rover/mpc_core.py']
@@ -161,7 +162,7 @@ def bag_record_command(remote_dir):
     return f'{ROS_SETUP} && ros2 bag record -o {remote_dir} {BAG_TOPICS}'
 
 
-def watch_node(proc, deadline_s):
+def watch_node(proc, deadline_s, stop_event=None):
     """node の stdout を別スレッドで読み、'目標到達' が出るか deadline まで監視する。
 
     text=Trueの読み込みバッファはselect()の監視対象（rawfd）とズレるため、
@@ -190,6 +191,8 @@ def watch_node(proc, deadline_s):
                 break
         if reached:
             break
+        if stop_event is not None and stop_event.is_set():
+            break        # q停止: finally 節の KILL_CMD が follower を止める
         # dequeが空でプロセスも終了済みなら、直前で最後まで drain 済みなので
         # 取りこぼしなく終了できる（求解失敗等でノードが落ちたケース）。
         if not lines and proc.poll() is not None:
@@ -209,9 +212,11 @@ class RealBackend:
 
     name = 'real'
 
-    def __init__(self, batch, dry_run=False):
+    def __init__(self, batch, dry_run=False, auto=False, stop_event=None):
         self.batch = batch
         self.dry_run = dry_run
+        self.auto = auto
+        self.stop_event = stop_event
         self.host = None
 
     def _ssh_args(self, cmd):
@@ -281,10 +286,15 @@ class RealBackend:
             print(f"  scp : {remote_bag} -> {outdir}/{cond['name']}_r{rep}")
             return dict(ok=False, metrics={}, bagdir='', note='dry-run')
 
-        ans = input(f"\n次: {cond['name']} rep{rep}/{self.batch['repeats']}。"
-                    f'ロボットを原点に戻して Enter（q で中断）: ')
-        if ans.strip().lower() == 'q':
-            raise KeyboardInterrupt
+        if self.auto:
+            print(f"\n[auto] {cond['name']} rep{rep}/{self.batch['repeats']} "
+                  '走行開始')
+        else:
+            ans = input(f"\n次: {cond['name']} rep{rep}/"
+                        f"{self.batch['repeats']}。"
+                        f'ロボットを原点に戻して Enter（q で中断）: ')
+            if ans.strip().lower() == 'q':
+                raise KeyboardInterrupt
 
         self._ssh(f'rm -rf {remote_bag}')
         rec = subprocess.Popen(self._ssh_args(r_cmd),
@@ -296,7 +306,7 @@ class RealBackend:
         margin = STARTUP_MARGIN_S[cond['controller']]
         deadline = time.time() + float(self.batch['timeout_s']) + margin
         try:
-            reached = watch_node(node, deadline)
+            reached = watch_node(node, deadline, self.stop_event)
         finally:
             self._ssh(KILL_CMD)
             time.sleep(1.0)          # 停止指令publish・bag flush待ち
