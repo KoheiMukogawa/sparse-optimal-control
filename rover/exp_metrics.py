@@ -68,3 +68,40 @@ def compute_metrics(twist, perr=(), solve_ms=()):
         solve_p95=_pct(sv, 0.95),
         solve_max=sv[-1] if sv else float('nan'),
     )
+
+
+def _dist_to_polyline(waypoints, x, y):
+    """点 (x,y) から折れ線経路への最短距離 [m]。"""
+    best = float('inf')
+    for i in range(len(waypoints) - 1):
+        ax, ay = waypoints[i]
+        bx, by = waypoints[i + 1]
+        dx, dy = bx - ax, by - ay
+        t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy)
+                         / (dx * dx + dy * dy)))
+        d = math.hypot(x - (ax + t * dx), y - (ay + t * dy))
+        best = min(best, d)
+    return best
+
+
+def truth_metrics(rows, waypoints, window_s=0.5):
+    """カメラ真値 rows → 終点（末尾window_sの平均・θは円形平均）と横偏差RMSE。
+
+    rows: [(t_s, x, y, theta, n_tags, quality_px)]（欠測は x=None）。
+    有効行ゼロなら {}（runs.csv の truth列は空欄のまま）。
+    """
+    valid = [r for r in rows if r[1] is not None]
+    if not valid:
+        return {}
+    t_end = valid[-1][0]
+    win = [r for r in valid if r[0] >= t_end - window_s]
+    ex = sum(r[1] for r in win) / len(win)
+    ey = sum(r[2] for r in win) / len(win)
+    eth = math.atan2(sum(math.sin(r[3]) for r in win),
+                     sum(math.cos(r[3]) for r in win))
+    gx, gy = waypoints[-1]
+    rmse = math.sqrt(sum(_dist_to_polyline(waypoints, r[1], r[2]) ** 2
+                         for r in valid) / len(valid))
+    return dict(truth_end_x=ex, truth_end_y=ey, truth_end_theta=eth,
+                truth_end_dist_cm=math.hypot(ex - gx, ey - gy) * 100.0,
+                truth_rmse_cm=rmse * 100.0)
