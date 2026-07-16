@@ -1,5 +1,26 @@
 # Handoff - 2026-07-16
 
+## 2026-07-16 セッション13b（Phase 1 実走行検証＋Phase 2+3 全自動化実装）
+
+- **C270キャリブ完了**（誤差0.261px・ブレフレーム自動除去をCLIに追加）、
+  床タグ4枚の座標を距離2点測位で確定（コース実寸: 1m L字の脚99/100cm）。
+- **カメラ真値の実走行検証＝合格**: 1m L字 l2 1本で手実測と **2.5cm / 1.6°一致**、
+  odom が見逃す x+7.9cm の滑りを検出（results/2026-07-16_Lturn_1m_smoke2/）。
+  教訓: **床タグはコースを囲む配置にする**（片側偏在だとゴールが外挿地帯で10-15cm誤差）。
+- **Phase 2+3 実装完了**（計画: plans/2026-07-16-camera-truth-phase23.md、SDD実行）:
+  - `rover/truth_live.py`: C270ライブ検出（calibrate→スレッド→pose/start/stop）
+  - `rover/udp_twist_bridge.py`: RPi用 UDP→rover_twist（watchdog0.5s・seq破棄・クランプ）
+  - `rover/homing.py`: TURN→GO→ALIGN の原点復帰（±3cm/±5°・pose途絶/コース外/
+    タイムアウト停止）。**計画のバグをテストが検出**: ゴール行き過ぎでKanayamaの
+    FFと引き戻しが釣り合う平衡点（4.8cm停滞）→ 10cm圏内は後退許可のgo-to-point則
+  - `rover/run_batch.py --auto`: 一括許可→走行→truth_*.csv→復帰→次走行。
+    q+Enter即停止・連続2失敗停止・truth_end_*/truth_rmse_cm 列追加
+  - テストは全て fake/合成画像（実カメラ・実ソケット不使用）で全green
+- **実機E2Eは未実施**: usbipd で C270 を WSL に attach（ユーザー作業）→
+  手順: docs/作業記録/全自動バッチ運用手順.md の「初回実機E2E」節。
+- 運用注意: nav_base の多重起動事故あり（同名ノード3重でモータ指令競合の恐れ→
+  全kill→1つだけ起動で復旧）。ブリッジはlaptop側再起動時にRPi側も再起動（seq巻き戻り対策）。
+
 ## 2026-07-16 セッション13（カメラ真値パイプライン Phase 1 実装完了）
 
 - 設計承認: `docs/superpowers/specs/2026-07-16-camera-truth-pipeline-design.md`
