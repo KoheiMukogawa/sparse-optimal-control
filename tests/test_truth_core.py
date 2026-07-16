@@ -51,6 +51,9 @@ def test_solve_camera_pose_recovers_camera_center():
 
 def test_solve_camera_pose_rejects_collinear_tags():
     """床タグ4枚が一直線だと退化 → 分かるメッセージの CalibError。"""
+    import pytest
+
+    from truth_core import CalibError, solve_camera_pose
     line_tags = {0: (-0.2, -0.2), 1: (0.4, -0.2), 2: (1.0, -0.2),
                  3: (1.7, -0.2)}
     rvec, tvec = look_down_pose()
