@@ -43,7 +43,9 @@ def load_config(path):
                 dist=np.asarray(cam['dist'], dtype=np.float64),
                 image_size=tuple(cam['image_size']),
                 floor_tags={int(k): tuple(v) for k, v in floor.items()},
-                robot=cfg['robot_tag'])
+                robot=cfg['robot_tag'],
+                live=cfg.get('live', {}),
+                udp=cfg.get('udp', {}))
 
 
 def _check_size(gray, cfg):
