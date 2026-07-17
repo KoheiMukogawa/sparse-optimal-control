@@ -114,12 +114,13 @@ def test_update_yaml_replaces_only_floor_tags(tmp_path):
     import shutil, yaml
     p = tmp_path / 'camera_truth.yaml'
     shutil.copy('configs/camera_truth.yaml', p)
+    before = yaml.safe_load(p.read_text())
     tags = {0: (0.0, -0.2), 1: (0.43, 0.4), 2: (1.13, 1.15), 3: (1.19, -0.3)}
     update_yaml(p, tags, rms_px=0.42, when='2026-07-17')
     cfg = yaml.safe_load(p.read_text())
     assert cfg['floor_tags'][2] == [1.13, 1.15]
-    assert cfg['robot_tag']['z_m'] == 0.12       # 他キーは無傷
-    assert cfg['camera']['image_size'] == [1280, 720]
+    assert cfg['robot_tag'] == before['robot_tag']     # 他キーは無傷
+    assert cfg['camera'] == before['camera']           # （実configの値に依存しない）
     assert '2026-07-17' in p.read_text()          # 日付コメント
 
 
@@ -191,8 +192,13 @@ def test_run_survey_writes_yaml_and_checks(tmp_path):
 
 def test_capture_detections_rejects_wrong_image_size(tmp_path):
     """キャリブ解像度と違う画像はK誤適用になるので拒否（--image経路）。"""
-    import cv2
+    import cv2, shutil, yaml
     from survey_tags import _capture_detections
+    cfgp = tmp_path / 'camera_truth.yaml'
+    shutil.copy('configs/camera_truth.yaml', cfgp)
+    c = yaml.safe_load(cfgp.read_text())
+    c['camera']['image_size'] = [1280, 720]   # 画像(640x360)と意図的に不一致
+    cfgp.write_text(yaml.safe_dump(c, allow_unicode=True, sort_keys=False))
     rvec, tvec = look_down_pose()
     img = render_scene((640, 360), K_TEST, DIST0, rvec, tvec,
                        [(tid, tag_corners3d(v[:2], SIZE, yaw=v[2]))
@@ -200,4 +206,4 @@ def test_capture_detections_rejects_wrong_image_size(tmp_path):
     f = tmp_path / 'wrong_size.png'
     cv2.imwrite(str(f), img)
     with pytest.raises(CalibError):
-        _capture_detections('configs/camera_truth.yaml', str(f), 1)
+        _capture_detections(str(cfgp), str(f), 1)

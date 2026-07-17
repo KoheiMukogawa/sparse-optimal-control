@@ -146,7 +146,11 @@ def auto_batch(batch, backend, truth, sender, cfg, outdir, csv_path,
     from exp_backends import load_path
     from exp_metrics import truth_metrics
     if homing_fn is None:
-        from homing import home as homing_fn
+        from functools import partial
+        from homing import home
+        # 実機は加減速＋カメラ遅延でALIGNが遅く、既定30sでは不足
+        # （2026-07-17実測: 7cm/10°の小補正でも40.7s）
+        homing_fn = partial(home, timeout_s=45)
     # 初回走行が失敗すると bag 回収前に truth CSV を書く＝outdir が無いと
     # ここで落ちてバッチ全体が止まる（設計契約「1本の失敗は止めない」違反）
     Path(outdir).mkdir(parents=True, exist_ok=True)

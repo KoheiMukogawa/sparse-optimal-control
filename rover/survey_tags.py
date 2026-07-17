@@ -19,7 +19,8 @@ from scipy.optimize import least_squares
 from truth_core import CalibError
 
 FLOOR_IDS = (0, 1, 2, 3)
-ORIGIN_OFFSET_M = 0.20   # 原点 = tag0中心 + 0.20m·(+y)
+ORIGIN_OFFSET_M = 0.30   # 原点 = tag0中心 + 0.30m·(+y)。20cmだと原点付近の旋回で
+                         # ロボットがtag0を踏む（2026-07-17実機）→30cmに拡大
 
 
 def square_corners3d(center_xy, size_m, yaw=0.0):
