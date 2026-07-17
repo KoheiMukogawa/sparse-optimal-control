@@ -33,7 +33,13 @@
   - 副産物の知見: **7/16の実タグ配置は原点(0,0)も凸包外だった**（check_layout が
     過去実運用より厳格）。今後はサーベイがコース内包を強制する
   - テスト67本全green。詳細ledger: .superpowers/sdd/progress.md
-- 次: **final review（fable・全ブランチ）→ 実機側の残作業**:
+- **final review 完了（Ready）**: fable がセッション上限で落ちたためコントローラ
+  （Opus）が直接実施。Important 1件を db4a3cc で修正＝サーベイ経路の解像度
+  無照合（usbipd フォールバック 640x480 で K 誤適用→もっともらしい floor_tags を
+  黙って出す穴。truth_live の _check_size と同じ検証を --image・ライブ両経路に追加）。
+  yaml ラウンドトリップ（update_yaml→load_config・intキー・size_m保持）検証済み。
+  Minor 棚卸しは全件許容。テスト68本全green
+- 次: **実機側の残作業**:
   ①floor_tag_size_m を定規実測（yaml の 0.150 は仮置き） ②サーベイ実行→
   既知点2点で静置照合（±1〜2cm） ③Phase 2+3 実機E2E（usbipd attach→
   ブリッジ疎通→homing単体→短autoループ→フルバッチ、
