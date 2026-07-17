@@ -161,6 +161,8 @@ def test_average_detections_requires_all_tags():
     assert np.allclose(avg[0], d1[0] + 0.25)
     with pytest.raises(CalibError):
         average_detections([d1, {0: d1[0]}])   # 欠けフレームは拒否
+    with pytest.raises(CalibError):
+        average_detections([])                  # 空リスト拒否
 
 
 def test_run_survey_writes_yaml_and_checks(tmp_path):

@@ -12,6 +12,7 @@ import re
 import datetime
 import argparse
 import yaml
+import time
 from pathlib import Path
 from scipy.optimize import least_squares
 
@@ -196,6 +197,8 @@ def update_yaml(path, tags_xy, rms_px, when=None):
 
 def average_detections(dets):
     """複数フレームの検出を平均（画素ノイズ低減）。全フレーム4枚揃い必須。"""
+    if not dets:
+        raise CalibError('検出フレームが0枚（--frames は1以上を指定）')
     for d in dets:
         missing = [t for t in FLOOR_IDS if t not in d]
         if missing:
@@ -232,7 +235,6 @@ def run_survey(cfg_path, det, path_file, dry_run=False):
 
 def _capture_detections(cfg_path, image, frames):
     """--image なら1枚、なければ CameraSource から frames 枚検出する。"""
-    detector = None
     from truth_core import make_detector, detect_tags
     detector = make_detector()
     if image:
@@ -248,8 +250,14 @@ def _capture_detections(cfg_path, image, frames):
     try:
         dets = []
         while len(dets) < frames:
-            r = src.read()
-            if r is None:
+            retry_count = 0
+            while retry_count < 20:
+                r = src.read()
+                if r is not None:
+                    break
+                retry_count += 1
+                time.sleep(0.05)
+            if retry_count == 20:
                 raise CalibError('カメラからフレームを読めない'
                                  '（usbipd attach を確認）')
             dets.append(detect_tags(r[1], detector))
