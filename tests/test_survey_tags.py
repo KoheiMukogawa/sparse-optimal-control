@@ -121,3 +121,33 @@ def test_update_yaml_replaces_only_floor_tags(tmp_path):
     assert cfg['robot_tag']['z_m'] == 0.12       # 他キーは無傷
     assert cfg['camera']['image_size'] == [1280, 720]
     assert '2026-07-17' in p.read_text()          # 日付コメント
+
+
+def test_surveyed_tags_give_robot_pose_within_1cm():
+    """サーベイ結果→solve_camera_pose→robot_pose の伝播込みE2E。"""
+    from survey_tags import refine, to_course_frame
+    from truth_core import robot_pose, solve_camera_pose
+    Z_ROBOT = 0.12
+    robot_true = (0.5, 0.3, 0.7)   # 中間フレーム基準の真値
+    # シーン: 床タグ4枚＋ロボットタグid10（中間フレームで直接定義）
+    inter = to_intermediate(TRUE)
+    tags_scene = {tid: (inter[tid][0], inter[tid][1], TRUE[tid][2])
+                  for tid in FLOOR_IDS}
+    rvec, tvec = look_down_pose(cam_xy=(0.6, 0.55))
+    img = render_scene(
+        (1280, 720), K_TEST, DIST0, rvec, tvec,
+        [(tid, tag_corners3d(v[:2], SIZE, yaw=v[2]))
+         for tid, v in tags_scene.items()] +
+        [(10, tag_corners3d(robot_true[:2], 0.12, yaw=robot_true[2],
+                            z=Z_ROBOT))])
+    det = detect_tags(img, make_detector())
+    # サーベイ（床タグのみ渡す）→ コース座標の floor_tags
+    floor = to_course_frame(refine(
+        {t: det[t] for t in FLOOR_IDS}, SIZE, K_TEST, DIST0)[0])
+    # 走行時と同じ経路: サーベイ結果でカメラ姿勢→ロボットpose
+    rv, tv = solve_camera_pose(floor, det, K_TEST, DIST0)
+    x, y, th = robot_pose(det[10], K_TEST, DIST0, rv, tv, Z_ROBOT)
+    from survey_tags import ORIGIN_OFFSET_M
+    want = (robot_true[0], robot_true[1] - ORIGIN_OFFSET_M)
+    assert np.hypot(x - want[0], y - want[1]) < 0.01
+    assert abs(th - robot_true[2]) < 0.02
