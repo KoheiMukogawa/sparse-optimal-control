@@ -24,9 +24,20 @@
   黙って通さないため。
 - トークン節約: handoff.md を現役分のみに分割（本ファイル）、CLAUDE.md の
   現在地を圧縮。SDD（haiku実装/sonnetレビュー/fable最終レビュー）は継続。
-- 次: 自動サーベイの設計提示→承認→writing-plans→実装（brainstorming 途中、
-  設計 doc 未作成）。その後 Phase 2+3 実機E2E（usbipd attach→ブリッジ疎通→
-  homing単体→短autoループ→フルバッチ、手順: docs/作業記録/全自動バッチ運用手順.md）
+- **タグ自動サーベイ実装完了（SDD・Task1-7）**: spec/plan 承認→7タスク実行。
+  `rover/survey_tags.py`（初期解IPPE→16隅一括最適化→規約変換→チェック→yaml更新、
+  CLI: ライブ5フレーム平均/--image/--dry-run）＋ `solve_camera_pose` に
+  ランタイム残差チェック（2px超CalibError＝タグ移動・古いyamlを黙って通さない）。
+  - **合成ゲート合格: floor_tags 復元 最悪0.57cm（12ケース）／robot_pose E2E
+    伝播 0.033cm・0.0016rad** → 案B成立、メジャー実測は廃止
+  - 副産物の知見: **7/16の実タグ配置は原点(0,0)も凸包外だった**（check_layout が
+    過去実運用より厳格）。今後はサーベイがコース内包を強制する
+  - テスト67本全green。詳細ledger: .superpowers/sdd/progress.md
+- 次: **final review（fable・全ブランチ）→ 実機側の残作業**:
+  ①floor_tag_size_m を定規実測（yaml の 0.150 は仮置き） ②サーベイ実行→
+  既知点2点で静置照合（±1〜2cm） ③Phase 2+3 実機E2E（usbipd attach→
+  ブリッジ疎通→homing単体→短autoループ→フルバッチ、
+  手順: docs/作業記録/全自動バッチ運用手順.md）
 
 ## 2026-07-16 セッション13b（Phase 1 実走行検証＋Phase 2+3 全自動化実装）
 
