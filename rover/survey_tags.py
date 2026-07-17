@@ -8,6 +8,7 @@
 """
 import numpy as np
 import cv2
+from scipy.optimize import least_squares
 
 from truth_core import CalibError
 
@@ -79,3 +80,52 @@ def initial_guess(det, size_m, K, dist):
     tags0[0] = (0.0, 0.0, tags0[0][2])
     tags0[3] = (tags0[3][0], 0.0, tags0[3][2])
     return rvec0, tvec0, tags0
+
+
+MAX_RMS_PX = 1.0
+
+
+def _unpack(p):
+    """最適化パラメータ→(rvec, tvec, tags)。ゲージはtag0=(0,0)・tag3のy=0。"""
+    tags = {0: (0.0, 0.0, p[6]),
+            1: (p[7], p[8], p[9]),
+            2: (p[10], p[11], p[12]),
+            3: (p[13], 0.0, p[14])}
+    return p[:3], p[3:6].reshape(3, 1), tags
+
+
+def _residuals(p, det, size_m, K, dist):
+    rvec, tvec, tags = _unpack(p)
+    res = []
+    for tid in FLOOR_IDS:
+        x, y, yaw = tags[tid]
+        proj, _ = cv2.projectPoints(square_corners3d((x, y), size_m, yaw),
+                                    rvec, tvec, K, dist)
+        res.append((proj.reshape(4, 2) - det[tid]).ravel())
+    return np.concatenate(res)
+
+
+def refine(det, size_m, K, dist):
+    """16隅の一括最適化。返り値 ({id: (x, y)} 中間フレーム, 再投影RMS[px])。
+
+    単体PnPの奥行きノイズを床平面拘束＋16点同時フィットで抑える。
+    RMS > MAX_RMS_PX なら CalibError（配置・照明・キャリブずれの疑い）。
+    """
+    rvec0, tvec0, tags0 = initial_guess(det, size_m, K, dist)
+    p0 = np.concatenate([
+        np.asarray(rvec0).ravel(), np.asarray(tvec0).ravel(),
+        [tags0[0][2]],
+        [tags0[1][0], tags0[1][1], tags0[1][2]],
+        [tags0[2][0], tags0[2][1], tags0[2][2]],
+        [tags0[3][0], tags0[3][2]]])
+    sol = least_squares(_residuals, p0, args=(det, size_m, K, dist),
+                        method='lm')
+    err = sol.fun.reshape(-1, 2)
+    rms = float(np.sqrt(np.mean(np.sum(err ** 2, axis=1))))
+    if rms > MAX_RMS_PX:
+        raise CalibError(
+            f'サーベイ再投影残差 {rms:.2f}px（>{MAX_RMS_PX}px）: '
+            'タグの平坦性・照明・キャリブを疑う。置き直して再実行')
+    _, _, tags = _unpack(sol.x)
+    return {tid: (float(t[0]), float(t[1]))
+            for tid, t in tags.items()}, rms

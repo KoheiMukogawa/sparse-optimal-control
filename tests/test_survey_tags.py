@@ -48,3 +48,39 @@ def test_initial_guess_recovers_layout_roughly():
     assert abs(tags0[3][1]) < 1e-9          # ゲージ: tag3 は y=0
     for tid in FLOOR_IDS:                    # 初期解は5cm以内でよい
         assert np.linalg.norm(np.array(tags0[tid][:2]) - want[tid]) < 0.05
+
+
+def test_refine_recovers_tags_within_1cm_across_conditions():
+    """合成の統計ゲート: カメラ高さ・傾き・配置を振って復元誤差≤1cm。"""
+    from survey_tags import refine
+    layouts = [
+        TRUE,
+        {0: (0.1, -0.25, -0.2), 1: (0.5, 0.5, 0.4), 2: (1.2, 1.2, 0.0),
+         3: (1.25, -0.2, 0.1)},
+    ]
+    cams = [dict(), dict(height=2.0, roll_deg=6.0),
+            dict(cam_xy=(0.6, 0.9), height=2.4)]
+    rng = np.random.default_rng(0)
+    worst = 0.0
+    for true_tags in layouts:
+        want = to_intermediate(true_tags)
+        for kw in cams:
+            det = make_det(true_tags, cam_kw=kw)
+            # レンダリングノイズに加え±0.3pxの隅ノイズも1ケースずつ（spec準拠）
+            noisy = {t: c + rng.normal(0, 0.3, c.shape) for t, c in det.items()}
+            for d in (det, noisy):
+                tags_xy, rms = refine(d, SIZE, K_TEST, DIST0)
+                assert rms < 1.0, f'再投影RMS {rms:.2f}px'
+                for tid in FLOOR_IDS:
+                    e = np.linalg.norm(np.array(tags_xy[tid]) - want[tid])
+                    worst = max(worst, e)
+    assert worst < 0.01, f'最悪復元誤差 {worst*100:.2f}cm（ゲート1cm）'
+
+
+def test_refine_rejects_high_residual():
+    """検出corner を人工的に壊すと CalibError（黙って通さない）。"""
+    from survey_tags import refine
+    det = make_det(TRUE)
+    det[2] = det[2] + np.array([[8.0, 0.0], [-8.0, 0.0], [0.0, 8.0], [0.0, -8.0]])   # tag2 隅ごとに矛盾注入
+    with pytest.raises(CalibError):
+        refine(det, SIZE, K_TEST, DIST0)
