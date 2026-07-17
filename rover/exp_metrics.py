@@ -89,6 +89,12 @@ def truth_metrics(rows, waypoints, window_s=0.5):
 
     rows: [(t_s, x, y, theta, n_tags, quality_px)]（欠測は x=None）。
     有効行ゼロなら {}（runs.csv の truth列は空欄のまま）。
+
+    追従指標（truth_end_dist_cm / truth_rmse_cm）は **実測した開始poseに
+    固定したコース** 基準。follower はコースを自分の開始位置・向き基準で
+    描くため、homing の向き残差（±2°でも1.4m先で±5cm）が追従誤差に
+    混入しないようにする。タグ座標系ゴールへの絶対距離は
+    truth_end_dist_abs_cm に別掲（設営・homing品質の指標）。
     """
     valid = [r for r in rows if r[1] is not None]
     if not valid:
@@ -99,9 +105,21 @@ def truth_metrics(rows, waypoints, window_s=0.5):
     ey = sum(r[2] for r in win) / len(win)
     eth = math.atan2(sum(math.sin(r[3]) for r in win),
                      sum(math.cos(r[3]) for r in win))
-    gx, gy = waypoints[-1]
-    rmse = math.sqrt(sum(_dist_to_polyline(waypoints, r[1], r[2]) ** 2
+    # 開始pose（先頭window_sの平均）でコースを回転・平行移動
+    t0 = valid[0][0]
+    w0 = [r for r in valid if r[0] <= t0 + window_s]
+    sx = sum(r[1] for r in w0) / len(w0)
+    sy = sum(r[2] for r in w0) / len(w0)
+    sth = math.atan2(sum(math.sin(r[3]) for r in w0),
+                     sum(math.cos(r[3]) for r in w0))
+    c, s = math.cos(sth), math.sin(sth)
+    course = [(sx + c * px - s * py, sy + s * px + c * py)
+              for px, py in waypoints]
+    gx, gy = course[-1]
+    agx, agy = waypoints[-1]
+    rmse = math.sqrt(sum(_dist_to_polyline(course, r[1], r[2]) ** 2
                          for r in valid) / len(valid))
     return dict(truth_end_x=ex, truth_end_y=ey, truth_end_theta=eth,
                 truth_end_dist_cm=math.hypot(ex - gx, ey - gy) * 100.0,
+                truth_end_dist_abs_cm=math.hypot(ex - agx, ey - agy) * 100.0,
                 truth_rmse_cm=rmse * 100.0)

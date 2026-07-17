@@ -18,7 +18,8 @@ from follower_core import (clamp, goal_scaled_vr, kanayama_cmd,
 V_HOME = 0.08
 W_MAX = 1.0
 TOL_POS = 0.03
-TOL_YAW = math.radians(5)
+TOL_YAW = math.radians(2)       # 開始向き残差は1.4m先で sin(θ)·140cm 効くため2°まで絞る
+W_ALIGN_MIN = 0.15              # ALIGNの最低旋回速度（静止摩擦で止まらない下限）
 TIMEOUT_S = 30.0
 MARGIN_M = 0.30
 KAN_GAINS = dict(k_x=0.5, k_y=5.0, k_th=3.0)   # exp_backends と同値
@@ -98,7 +99,8 @@ class HomingController:
         err = normalize_angle(tth - th)          # ALIGN
         if abs(err) < TOL_YAW:
             return 0.0, 0.0, 'done'
-        return 0.0, clamp(K_TURN * err, W_MAX), 'run'
+        w = math.copysign(max(W_ALIGN_MIN, K_TURN * abs(err)), err)
+        return 0.0, clamp(w, W_MAX), 'run'
 
 
 class UdpTwistSender:

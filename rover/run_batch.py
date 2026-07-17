@@ -31,7 +31,7 @@ CSV_COLUMNS = [
     'drive_s', 'rmse_cm', 'sum_u', 'w_zero_ratio', 'flips', 'sat_ratio',
     'max_w', 'solve_p50', 'solve_p95', 'solve_max',
     'truth_end_x', 'truth_end_y', 'truth_end_theta',
-    'truth_end_dist_cm', 'truth_rmse_cm',
+    'truth_end_dist_cm', 'truth_end_dist_abs_cm', 'truth_rmse_cm',
     'bagdir', 'note',
 ]
 

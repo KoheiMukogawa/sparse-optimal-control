@@ -36,8 +36,10 @@ class FakeTruth:
     def stop(self):
         # 本物の TruthLive.stop() 同様にCSVを書く（outdir未作成なら落ちる）
         Path(self.started[-1]).write_text('t_s\n')
-        # ゴール到達済みの軌跡もどき（最後の0.5sは(1.0,1.0)付近）
-        return [(0.1 * i, 1.0, 1.0, 1.57, 5, 300.0) for i in range(20)]
+        # 原点発→ゴール到達済みの軌跡もどき（先頭0.5sは原点静止・
+        # 最後の0.5sは(1.0,1.0)。truth_metrics は開始pose基準なので開始行が要る）
+        return ([(0.1 * i, 0.0, 0.0, 0.0, 5, 300.0) for i in range(6)] +
+                [(0.6 + 0.1 * i, 1.0, 1.0, 1.57, 5, 300.0) for i in range(20)])
 
     def pose(self, max_age_s=1.0):
         return (1.0, 1.0, 1.57)
