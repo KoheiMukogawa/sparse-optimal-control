@@ -110,3 +110,26 @@ def test_parallax_correction_is_necessary():
     p_ok = pixel_to_plane(c_px, K_TEST, DIST0, rv, tv, 0.13)
     p_naive = pixel_to_plane(c_px, K_TEST, DIST0, rv, tv, 0.0)
     assert np.linalg.norm(p_ok - p_naive) > 0.03
+
+
+def test_solve_camera_pose_rejects_stale_floor_tags():
+    """floor_tags が実配置とズレている（タグが動いた）と CalibError。"""
+    from synth_scene import (K_TEST, DIST0, look_down_pose, tag_corners3d,
+                             render_scene)
+    from truth_core import (CalibError, detect_tags, make_detector,
+                            solve_camera_pose)
+    import pytest
+    true_tags = {0: (0.0, -0.2), 1: (0.43, 0.4), 2: (1.13, 1.15),
+                 3: (1.19, -0.3)}
+    rvec, tvec = look_down_pose()
+    img = render_scene((1280, 720), K_TEST, DIST0, rvec, tvec,
+                       [(tid, tag_corners3d(xy, 0.15))
+                        for tid, xy in true_tags.items()])
+    det = detect_tags(img, make_detector())
+    # 正しい座標なら通る
+    solve_camera_pose(true_tags, det, K_TEST, DIST0)
+    # tag2 が10cm動いた古いyaml相当 → 拒否
+    stale = dict(true_tags)
+    stale[2] = (1.23, 1.15)
+    with pytest.raises(CalibError):
+        solve_camera_pose(stale, det, K_TEST, DIST0)

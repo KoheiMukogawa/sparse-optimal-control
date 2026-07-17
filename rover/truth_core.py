@@ -41,12 +41,13 @@ def tag_center(corners):
     return corners.mean(axis=0)
 
 
-def solve_camera_pose(floor_tags, detections, K, dist):
+def solve_camera_pose(floor_tags, detections, K, dist, max_residual_px=2.0):
     """床基準タグ中心（コース座標z=0）と検出中心から solvePnP。
 
     floor_tags: {id: (x_m, y_m)}。検出できた共通タグが4枚未満なら CalibError。
     返り値 (rvec, tvec): コース座標→カメラ座標の剛体変換。
     中心のみ使う（タグの向き・印刷サイズの実測が不要になるため）。
+    残差 max_residual_px 超で CalibError（タグ移動・yaml陳腐化の検出）。
     """
     obj, img = [], []
     for tid, xy in floor_tags.items():
@@ -68,6 +69,14 @@ def solve_camera_pose(floor_tags, detections, K, dist):
                          '広がる（三角形以上の面積を持つ）配置に貼り直す') from e
     if not ok:
         raise CalibError('solvePnP 失敗')
+    proj, _ = cv2.projectPoints(
+        np.asarray(obj, dtype=np.float64), rvec, tvec, K, dist)
+    rms = float(np.sqrt(np.mean(
+        np.sum((proj.reshape(-1, 2) - np.asarray(img)) ** 2, axis=1))))
+    if rms > max_residual_px:
+        raise CalibError(
+            f'床タグ再投影残差 {rms:.1f}px（>{max_residual_px}px）: '
+            'タグが動いた/floor_tags が古い疑い。survey_tags.py を再実行')
     return rvec, tvec
 
 
