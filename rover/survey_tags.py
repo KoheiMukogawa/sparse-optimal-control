@@ -140,6 +140,16 @@ def refine(det, size_m, K, dist):
 MIN_HULL_AREA_M2 = 0.3
 
 
+def _check_image_size(gray, expect):
+    """フレーム解像度がキャリブ時 image_size と一致するか（K誤適用の防止）。"""
+    if expect is not None and \
+            (gray.shape[1], gray.shape[0]) != tuple(expect):
+        raise CalibError(
+            f'フレーム {gray.shape[1]}x{gray.shape[0]} が設定 image_size '
+            f'{tuple(expect)} と不一致: キャリブ時と同じ解像度で撮る'
+            '（usbipd 再attach 後のフォールバックを疑う）')
+
+
 def to_course_frame(tags_xy):
     """中間フレーム→コース座標（原点=tag0中心+0.20m·(+y)）。"""
     return {tid: (float(x), float(y - ORIGIN_OFFSET_M))
@@ -237,12 +247,14 @@ def _capture_detections(cfg_path, image, frames):
     """--image なら1枚、なければ CameraSource から frames 枚検出する。"""
     from truth_core import make_detector, detect_tags
     detector = make_detector()
+    cfg = yaml.safe_load(Path(cfg_path).read_text())
+    expect = cfg['camera'].get('image_size')
     if image:
         gray = cv2.imread(str(image), cv2.IMREAD_GRAYSCALE)
         if gray is None:
             raise CalibError(f'画像を読めない: {image}')
+        _check_image_size(gray, expect)
         return [detect_tags(gray, detector)]
-    cfg = yaml.safe_load(Path(cfg_path).read_text())
     live = cfg.get('live', {})
     from truth_live import CameraSource
     src = CameraSource(live.get('device', 0), live.get('width', 1280),
@@ -260,6 +272,7 @@ def _capture_detections(cfg_path, image, frames):
             if retry_count == 20:
                 raise CalibError('カメラからフレームを読めない'
                                  '（usbipd attach を確認）')
+            _check_image_size(r[1], expect)
             dets.append(detect_tags(r[1], detector))
         return dets
     finally:

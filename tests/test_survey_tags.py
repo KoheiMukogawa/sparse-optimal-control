@@ -187,3 +187,17 @@ def test_run_survey_writes_yaml_and_checks(tmp_path):
     before = p.read_text()
     run_survey(p, det, 'configs/path_L_turn_1m.yaml', dry_run=True)
     assert p.read_text() == before
+
+
+def test_capture_detections_rejects_wrong_image_size(tmp_path):
+    """キャリブ解像度と違う画像はK誤適用になるので拒否（--image経路）。"""
+    import cv2
+    from survey_tags import _capture_detections
+    rvec, tvec = look_down_pose()
+    img = render_scene((640, 360), K_TEST, DIST0, rvec, tvec,
+                       [(tid, tag_corners3d(v[:2], SIZE, yaw=v[2]))
+                        for tid, v in TRUE.items()])
+    f = tmp_path / 'wrong_size.png'
+    cv2.imwrite(str(f), img)
+    with pytest.raises(CalibError):
+        _capture_detections('configs/camera_truth.yaml', str(f), 1)
