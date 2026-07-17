@@ -84,3 +84,40 @@ def test_refine_rejects_high_residual():
     det[2] = det[2] + np.array([[8.0, 0.0], [-8.0, 0.0], [0.0, 8.0], [0.0, -8.0]])   # tag2 隅ごとに矛盾注入
     with pytest.raises(CalibError):
         refine(det, SIZE, K_TEST, DIST0)
+
+
+def test_to_course_frame_offsets_origin():
+    from survey_tags import to_course_frame, ORIGIN_OFFSET_M
+    tags = {0: (0.0, 0.0), 1: (0.4, 0.6), 2: (1.1, 1.35), 3: (1.2, 0.0)}
+    out = to_course_frame(tags)
+    assert out[0] == (0.0, -ORIGIN_OFFSET_M)
+    assert out[2] == (1.1, 1.35 - ORIGIN_OFFSET_M)
+
+
+def test_check_layout_rejects_collinear_and_outside_course():
+    from survey_tags import check_layout
+    L = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)]   # path_L_turn_1m と同じ
+    ok = {0: (0.0, -0.3), 1: (-0.1, 0.5), 2: (1.2, 1.2), 3: (1.25, -0.35)}
+    check_layout(ok, L)                          # 例外なし
+    collinear = {0: (0.0, 0.0), 1: (0.4, 0.01), 2: (0.8, 0.0),
+                 3: (1.2, 0.01)}
+    with pytest.raises(CalibError):
+        check_layout(collinear, L)
+    onesided = {0: (0.0, -0.2), 1: (0.5, -0.3), 2: (0.9, 0.4),
+                3: (1.2, -0.25)}                 # ゴール(1,1)が凸包の外
+    with pytest.raises(CalibError):
+        check_layout(onesided, L)
+
+
+def test_update_yaml_replaces_only_floor_tags(tmp_path):
+    from survey_tags import update_yaml
+    import shutil, yaml
+    p = tmp_path / 'camera_truth.yaml'
+    shutil.copy('configs/camera_truth.yaml', p)
+    tags = {0: (0.0, -0.2), 1: (0.43, 0.4), 2: (1.13, 1.15), 3: (1.19, -0.3)}
+    update_yaml(p, tags, rms_px=0.42, when='2026-07-17')
+    cfg = yaml.safe_load(p.read_text())
+    assert cfg['floor_tags'][2] == [1.13, 1.15]
+    assert cfg['robot_tag']['z_m'] == 0.12       # 他キーは無傷
+    assert cfg['camera']['image_size'] == [1280, 720]
+    assert '2026-07-17' in p.read_text()          # 日付コメント

@@ -8,6 +8,9 @@
 """
 import numpy as np
 import cv2
+import re
+import datetime
+from pathlib import Path
 from scipy.optimize import least_squares
 
 from truth_core import CalibError
@@ -129,3 +132,61 @@ def refine(det, size_m, K, dist):
     _, _, tags = _unpack(sol.x)
     return {tid: (float(t[0]), float(t[1]))
             for tid, t in tags.items()}, rms
+
+
+MIN_HULL_AREA_M2 = 0.3
+
+
+def to_course_frame(tags_xy):
+    """中間フレーム→コース座標（原点=tag0中心+0.20m·(+y)）。"""
+    return {tid: (float(x), float(y - ORIGIN_OFFSET_M))
+            for tid, (x, y) in tags_xy.items()}
+
+
+def check_layout(tags_xy, waypoints):
+    """共線・面積・コース内包チェック。違反は CalibError。
+
+    waypoints: コース座標の経路頂点 [(x, y), ...]（tags_xy と同じ系で渡す）。
+    コースが凸包の外＝外挿地帯は実績10-15cm誤差（7/16）のため拒否する。
+    """
+    hull = cv2.convexHull(
+        np.array([tags_xy[t] for t in FLOOR_IDS], dtype=np.float32))
+    area = float(cv2.contourArea(hull))
+    if area < MIN_HULL_AREA_M2:
+        raise CalibError(
+            f'床タグ凸包が小さすぎる（{area:.2f}m²<{MIN_HULL_AREA_M2}）: '
+            'ほぼ一直線か密集。コースを囲む四隅に広げて置き直す')
+    # 経路を5cm刻みでサンプルして全点が凸包内にあるか
+    bad = []
+    for a, b in zip(waypoints[:-1], waypoints[1:]):
+        a, b = np.asarray(a, float), np.asarray(b, float)
+        n = max(2, int(np.linalg.norm(b - a) / 0.05) + 1)
+        for s in np.linspace(0.0, 1.0, n):
+            p = a + s * (b - a)
+            if cv2.pointPolygonTest(hull, (float(p[0]), float(p[1])),
+                                    False) < 0:
+                bad.append(p)
+    if bad:
+        c = np.mean(bad, axis=0)
+        raise CalibError(
+            f'コースがタグ凸包の外（外挿地帯・{len(bad)}点、'
+            f'中心 x={c[0]:.2f} y={c[1]:.2f} 付近）: '
+            'その方向のタグをコースの外側へ動かして囲む配置にする')
+
+
+def update_yaml(path, tags_xy, rms_px, when=None):
+    """configs/camera_truth.yaml の floor_tags ブロックだけ書き換える。"""
+    path = Path(path)
+    text = path.read_text()
+    when = when or datetime.date.today().isoformat()
+    block = ['floor_tags:      # id: [x_m, y_m]。survey_tags.py が自動生成',
+             f'  # {when} 自動サーベイ（再投影RMS {rms_px:.2f}px）']
+    for tid in FLOOR_IDS:
+        x, y = tags_xy[tid]
+        block.append(f'  {tid}: [{x:.3f}, {y:.3f}]')
+    new, n = re.subn(r'floor_tags:.*?(?=\nrobot_tag:)',
+                     '\n'.join(block) + '\n', text, flags=re.S)
+    if n != 1:
+        raise CalibError(f'{path} の floor_tags ブロックを特定できない'
+                         '（floor_tags: と robot_tag: の並びが前提）')
+    path.write_text(new)
