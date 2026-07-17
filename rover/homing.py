@@ -107,7 +107,10 @@ class UdpTwistSender:
     def __init__(self, host, port=8890):
         self.addr = (str(host), int(port))
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.seq = 0
+        # 時刻ベース初期値: sender再生成でもseqが単調増加になり、ブリッジの
+        # last_seq（再起動までリセットされない）に旧セッションの指令が
+        # 全破棄される事故を防ぐ（2026-07-17実機で発生）
+        self.seq = int(time.time() * 1000)
 
     def send(self, v, w):
         self.seq += 1
