@@ -4,7 +4,7 @@
 name: Lturn_1m_smoke
 path_file: configs/path_L_turn_1m.yaml
 backend: sim
-repeats: 1
+repeats: 2  # --auto の走行間homingを含めてE2E確認するため2本
 timeout_s: 60
 common: {horizon: 15, rate: 10.0}
 sim: {delay_steps: 2, pos_noise: 0.0, yaw_noise: 0.0}
