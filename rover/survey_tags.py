@@ -10,6 +10,8 @@ import numpy as np
 import cv2
 import re
 import datetime
+import argparse
+import yaml
 from pathlib import Path
 from scipy.optimize import least_squares
 
@@ -190,3 +192,87 @@ def update_yaml(path, tags_xy, rms_px, when=None):
         raise CalibError(f'{path} の floor_tags ブロックを特定できない'
                          '（floor_tags: と robot_tag: の並びが前提）')
     path.write_text(new)
+
+
+def average_detections(dets):
+    """複数フレームの検出を平均（画素ノイズ低減）。全フレーム4枚揃い必須。"""
+    for d in dets:
+        missing = [t for t in FLOOR_IDS if t not in d]
+        if missing:
+            raise CalibError(f'フレーム内で床タグ未検出: id={missing}。'
+                             '遮蔽・照明を確認して撮り直す')
+    return {tid: np.mean([d[tid] for d in dets], axis=0)
+            for tid in FLOOR_IDS}
+
+
+def run_survey(cfg_path, det, path_file, dry_run=False):
+    """検出→refine→規約変換→チェック→yaml更新の直列。返り値はコース座標。"""
+    cfg = yaml.safe_load(Path(cfg_path).read_text())
+    size = cfg.get('floor_tag_size_m')
+    if not size:
+        raise CalibError('floor_tag_size_m 未記入: 印刷黒枠を定規で1回実測して'
+                         ' configs/camera_truth.yaml に記入する')
+    K = np.asarray(cfg['camera']['K'], dtype=np.float64)
+    dist = np.asarray(cfg['camera']['dist'], dtype=np.float64)
+    floor_det = {t: det[t] for t in FLOOR_IDS if t in det}
+    tags_mid, rms = refine(floor_det, float(size), K, dist)
+    tags = to_course_frame(tags_mid)
+    way = yaml.safe_load(Path(path_file).read_text())['waypoints']
+    check_layout(tags, [tuple(w) for w in way])
+    print(f'サーベイOK: 再投影RMS {rms:.2f}px')
+    for tid in FLOOR_IDS:
+        print(f'  tag{tid}: ({tags[tid][0]:+.3f}, {tags[tid][1]:+.3f}) m')
+    if dry_run:
+        print('--dry-run: yaml は更新しない')
+    else:
+        update_yaml(cfg_path, tags, rms)
+        print(f'{cfg_path} の floor_tags を更新した')
+    return tags
+
+
+def _capture_detections(cfg_path, image, frames):
+    """--image なら1枚、なければ CameraSource から frames 枚検出する。"""
+    detector = None
+    from truth_core import make_detector, detect_tags
+    detector = make_detector()
+    if image:
+        gray = cv2.imread(str(image), cv2.IMREAD_GRAYSCALE)
+        if gray is None:
+            raise CalibError(f'画像を読めない: {image}')
+        return [detect_tags(gray, detector)]
+    cfg = yaml.safe_load(Path(cfg_path).read_text())
+    live = cfg.get('live', {})
+    from truth_live import CameraSource
+    src = CameraSource(live.get('device', 0), live.get('width', 1280),
+                       live.get('height', 720))
+    try:
+        dets = []
+        while len(dets) < frames:
+            r = src.read()
+            if r is None:
+                raise CalibError('カメラからフレームを読めない'
+                                 '（usbipd attach を確認）')
+            dets.append(detect_tags(r[1], detector))
+        return dets
+    finally:
+        src.release()
+
+
+def main():
+    ap = argparse.ArgumentParser(description='床タグ自動サーベイ')
+    ap.add_argument('--config', default='configs/camera_truth.yaml')
+    ap.add_argument('--image', default=None,
+                    help='静止画から（省略時はライブカメラ）')
+    ap.add_argument('--frames', type=int, default=5,
+                    help='ライブ時の平均フレーム数')
+    ap.add_argument('--path', default='configs/path_L_turn_1m.yaml',
+                    help='内包チェックに使うコース')
+    ap.add_argument('--dry-run', action='store_true')
+    a = ap.parse_args()
+    dets = _capture_detections(a.config, a.image, a.frames)
+    det = average_detections(dets)
+    run_survey(a.config, det, a.path, dry_run=a.dry_run)
+
+
+if __name__ == '__main__':
+    main()

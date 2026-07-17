@@ -151,3 +151,37 @@ def test_surveyed_tags_give_robot_pose_within_1cm():
     want = (robot_true[0], robot_true[1] - ORIGIN_OFFSET_M)
     assert np.hypot(x - want[0], y - want[1]) < 0.01
     assert abs(th - robot_true[2]) < 0.02
+
+
+def test_average_detections_requires_all_tags():
+    from survey_tags import average_detections
+    d1 = make_det(TRUE)
+    d2 = {tid: c + 0.5 for tid, c in d1.items()}
+    avg = average_detections([d1, d2])
+    assert np.allclose(avg[0], d1[0] + 0.25)
+    with pytest.raises(CalibError):
+        average_detections([d1, {0: d1[0]}])   # 欠けフレームは拒否
+
+
+def test_run_survey_writes_yaml_and_checks(tmp_path):
+    from survey_tags import run_survey
+    import shutil, yaml
+    p = tmp_path / 'camera_truth.yaml'
+    shutil.copy('configs/camera_truth.yaml', p)
+    cfg0 = yaml.safe_load(p.read_text())
+    cfg0['camera']['K'] = [[700.0, 0, 640], [0, 700.0, 360], [0, 0, 1]]
+    cfg0['camera']['dist'] = [0, 0, 0, 0, 0]
+    p.write_text(yaml.safe_dump(cfg0, allow_unicode=True, sort_keys=False))
+    # Use layout that properly encloses path_L_turn_1m: [(0,0), (1,0), (1,1)]
+    # in course frame (intermediate + ORIGIN_OFFSET_M shift)
+    layout = {0: (0.0, -0.1, 0.1), 1: (-0.1, 0.7, -0.3), 2: (1.2, 1.4, 0.05),
+              3: (1.25, -0.15, 0.2)}
+    det = make_det(layout)
+    tags = run_survey(p, det, 'configs/path_L_turn_1m.yaml', dry_run=False)
+    cfg = yaml.safe_load(p.read_text())
+    for tid in (0, 1, 2, 3):
+        assert np.allclose(cfg['floor_tags'][tid], tags[tid], atol=5e-4)
+    # dry-run は書き換えない
+    before = p.read_text()
+    run_survey(p, det, 'configs/path_L_turn_1m.yaml', dry_run=True)
+    assert p.read_text() == before
