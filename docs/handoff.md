@@ -1,9 +1,37 @@
-# Handoff - 2026-07-17
+# Handoff - 2026-07-19
 
 過去セッション（2026-06-12〜2026-07-15）の全文は
 `docs/作業記録/handoff_archive.md` に退避（必要時のみ参照）。
 
-## 2026-07-17 セッション14（進行中）
+## 2026-07-17深夜〜18 セッション14b（初回実機E2E＝ほぼ完走・多数の実機知見）
+
+- **サーベイ実機初回: 合格**。RMS 0.41px・dry-run→本実行で1mm再現・静置照合は
+  メジャー実測と +0.5/−1.3cm 一致（results/2026-07-17_survey_e2e/notes.md）。
+  メジャーレス設営が実機で成立
+- **カメラは 640x360 で運用**（configs 更新済み・K は1/2スケール）。
+  WSL標準カーネルの vhci_hcd が等時転送を約64KB/フレームで頭打ちにするため
+  720p は MJPG/YUYV とも尻切れ（fps低減は無効）。uvcvideo は
+  quirks=128 nodrop=1 timeout=5000 必須。手順書トラブルシュートに全記載
+- **homing 実機: 合格**（±3cm/±2°）。ゴール→原点のフル復帰も成功。
+  改良: 公差±5°→±2°・W_ALIGN_MIN=0.15（静止摩擦対策）・auto復帰timeout45s
+- **--auto スモーク: rep2 が truth_end 8.5cm / rmse 1.2cm で完走**（rep1 は
+  開始向きズレで100cm=原因判明済み）。results/2026-07-17_Lturn_smoke_auto/
+- **重要修正3件（すべて実機で発覚）**:
+  ①UdpTwistSender の seq を時刻ベース初期化（sender再生成で全指令が無言破棄
+  される事故を根絶。ブリッジ再起動運用が不要に） ②originオフセット20→30cm
+  （原点旋回で tag0 を踏む） ③robot_tag yaw_offset=+4.1°を直進自己校正で確定
+  （タグ貼り角。機体の見た目の向きズレの正体）
+- **評価系の仕様変更**: truth_end_dist_cm / truth_rmse_cm は**実測開始poseに
+  固定したコース基準**（homingの向き残差±2°が追従誤差に混入しない）。
+  タグ系ゴールへの絶対距離は truth_end_dist_abs_cm に分離。テスト69本全green
+- 残: クリーンなスモーク2本（results/2026-07-18_Lturn_smoke_auto2 予定）→
+  フルバッチ。**RPi は nav_base＋ブリッジが起動したまま**（次回そのまま使える。
+  止める場合: `ssh mukougawakouhei@192.168.0.32 "pkill -INT -f nav_base;
+  pkill -INT -f udp_twist"` → シャットダウン）
+- 課題: 「復帰だけ」の CLI が無い（run_batch を誤実行すると走行が始まる）→
+  --home-only を追加予定
+
+## 2026-07-17 セッション14（タグ自動サーベイ実装）
 
 - **床タグが移動済み＝旧 floor_tags 座標は無効**。solvePnP は黙って間違った
   値を出す（検出は成功するため警告なし）。configs/camera_truth.yaml の
@@ -70,4 +98,4 @@
   手順: docs/作業記録/全自動バッチ運用手順.md の「初回実機E2E」節（トラブル
   シュート節も参照）。RPi は本日シャットダウン済み。
 - 運用注意: nav_base の多重起動事故あり（同名ノード3重でモータ指令競合の恐れ→
-  全kill→1つだけ起動で復旧）。ブリッジはlaptop側再起動時にRPi側も再起動（seq巻き戻り対策）。
+  全kill→1つだけ起動で復旧）。
