@@ -1,0 +1,16 @@
+# 外乱バッチ: 積載 500g（1m L字・MPC3条件・真値評価が主指標）
+# 重りはペットボトル等を駆動軸直上・車体中心にテープ固定（毎回同位置・同姿勢）。
+# 重量替えは人手のため load ごとに別バッチ（バッチ内は --auto で全自動）。
+# 実行: uv run python rover/run_batch.py configs/batch_Lturn1m_load500.yaml \
+#         --backend real --auto --outdir results/<日付>_load500
+name: Lturn1m_load500
+path_file: configs/path_L_turn_1m.yaml
+backend: real
+repeats: 3
+timeout_s: 60
+common: {horizon: 15, rate: 10.0}
+sim: {delay_steps: 2, pos_noise: 0.0, yaw_noise: 0.0}
+conditions:
+  - {name: l2,     controller: l2}
+  - {name: l1,     controller: l1, lam: 0.3}
+  - {name: l1_ms2, controller: l1, lam: 0.3, move_suppress: 2.0}
