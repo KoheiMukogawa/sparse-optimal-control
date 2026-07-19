@@ -21,6 +21,7 @@ import statistics
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 import yaml
@@ -132,6 +133,30 @@ def _prompt(prompt, line_q, stop_event):
         except queue.Empty:
             continue
     return 'q'
+
+
+def home_once(truth, sender, cfg, stop_event=None, homing_fn=None,
+              warmup_s=5.0, sleep_fn=time.sleep, clock=time.monotonic):
+    """--home-only 本体: 初回poseを待って原点復帰を1回（失敗はリトライ1回）。
+
+    キャプチャスレッド起動直後は pose が None のため warmup_s まで待つ
+    （待たないと即 fail_pose になる。2026-07-17 実機で発生）。
+    """
+    if homing_fn is None:
+        from functools import partial
+        from homing import home
+        homing_fn = partial(home, timeout_s=45)
+    t0 = clock()
+    while truth.pose(1.0) is None:
+        if clock() - t0 > warmup_s:
+            return dict(ok=False, reason='no_pose', pose=None)
+        sleep_fn(0.05)
+    res = homing_fn(lambda: truth.pose(1.0), sender, cfg['floor_tags'],
+                    stop_event=stop_event)
+    if not res['ok'] and not (stop_event is not None and stop_event.is_set()):
+        res = homing_fn(lambda: truth.pose(1.0), sender, cfg['floor_tags'],
+                        stop_event=stop_event)
+    return res
 
 
 def auto_batch(batch, backend, truth, sender, cfg, outdir, csv_path,
@@ -248,6 +273,39 @@ def write_summary(outdir):
     (outdir / 'summary.md').write_text('\n'.join(lines) + '\n')
 
 
+def _home_only(backend, camera_config, stop_event):
+    """--home-only: 走行なしの原点復帰1回（許可プロンプトつき）。"""
+    from homing import UdpTwistSender
+    from truth_live import CameraSource, TruthLive
+    from truth_offline import load_config
+    cfg = load_config(camera_config)
+    ans = input('原点復帰を1回実行します（ロボットが動く）。'
+                '周辺の安全を確認 [y/N]: ')
+    if ans.strip().lower() != 'y':
+        print('中止しました')
+        return
+    live = cfg.get('live', {})
+    truth = TruthLive(cfg, CameraSource(live.get('device', 0),
+                                        live.get('width', 1280),
+                                        live.get('height', 720)))
+    sender = None
+    try:
+        truth.calibrate()
+        sender = UdpTwistSender(backend.host,
+                                cfg.get('udp', {}).get('port', 8890))
+        res = home_once(truth, sender, cfg, stop_event)
+        p = res.get('pose')
+        msg = f"復帰: ok={res['ok']} reason={res['reason']}"
+        if p is not None:
+            msg += (f' x={p[0] * 100:+.1f}cm y={p[1] * 100:+.1f}cm '
+                    f'th={math.degrees(p[2]):+.1f}°')
+        print(msg)
+    finally:
+        if sender is not None:
+            sender.close()
+        truth.close()
+
+
 def main():
     ap = argparse.ArgumentParser(description='バッチ実験ランナー')
     ap.add_argument('batch_yaml')
@@ -260,6 +318,8 @@ def main():
     ap.add_argument('--outdir', help='出力先（既定 results/<日付>_<名前>）')
     ap.add_argument('--auto', action='store_true',
                     help='実機のみ: 真値記録＋自動原点復帰の全自動ループ')
+    ap.add_argument('--home-only', action='store_true',
+                    help='実機のみ: 走行せず原点復帰を1回だけ実行して終了')
     ap.add_argument('--camera-config', default='configs/camera_truth.yaml')
     args = ap.parse_args()
 
@@ -276,8 +336,8 @@ def main():
         print(f'summary.md を再生成: {outdir}')
         return
 
-    if args.auto and backend_kind != 'real':
-        raise SystemExit('--auto は --backend real 専用です')
+    if (args.auto or args.home_only) and backend_kind != 'real':
+        raise SystemExit('--auto / --home-only は --backend real 専用です')
     if backend_kind == 'sim':
         backend = SimBackend(batch)
     else:
@@ -285,6 +345,9 @@ def main():
         stop_event = threading.Event()
         backend = RealBackend(batch, dry_run=args.dry_run,
                               auto=args.auto, stop_event=stop_event)
+        if args.home_only:
+            _home_only(backend, args.camera_config, stop_event)
+            return
         if not args.dry_run:
             n_runs = len(batch['conditions']) * int(batch['repeats'])
             extra = (f'\n  全{n_runs}本を自動実行（走行→真値→原点復帰）。'

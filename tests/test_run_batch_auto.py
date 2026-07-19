@@ -139,3 +139,57 @@ def test_auto_batch_respects_resume_done_and_only():
     assert backend.calls == 1 and rows[0]['rep'] == '2'   # rep1はskip
     backend, _, _, rows = _run(oks=[], homing_results=[], only='kanayama')
     assert backend.calls == 0 and rows == []              # 条件名不一致は走らない
+
+
+def test_home_once_waits_for_pose_then_homes():
+    """初回poseがNoneの間はwarmup待ち→取れたらhoming1回。"""
+    from run_batch import home_once
+
+    class WarmupTruth:
+        def __init__(self, none_calls):
+            self.n = none_calls
+
+        def pose(self, max_age_s=1.0):
+            if self.n > 0:
+                self.n -= 1
+                return None
+            return (0.5, 0.5, 0.1)
+
+    calls = []
+
+    def fake_home(pose_fn, sender, floor_tags, stop_event=None):
+        calls.append(1)
+        return dict(ok=True, reason='done', pose=(0.0, 0.0, 0.0))
+
+    clk = [0.0]
+    res = home_once(WarmupTruth(3), object(), {'floor_tags': {0: (0, 0)}},
+                    homing_fn=fake_home,
+                    sleep_fn=lambda s: clk.__setitem__(0, clk[0] + s),
+                    clock=lambda: clk[0])
+    assert res['ok'] and len(calls) == 1
+
+
+def test_home_once_retries_once_and_gives_up_on_no_pose():
+    from run_batch import home_once
+
+    class NoPoseTruth:
+        def pose(self, max_age_s=1.0):
+            return None
+
+    clk = [0.0]
+    res = home_once(NoPoseTruth(), object(), {'floor_tags': {}},
+                    homing_fn=lambda *a, **k: dict(ok=True, reason='done',
+                                                   pose=None),
+                    sleep_fn=lambda s: clk.__setitem__(0, clk[0] + s),
+                    clock=lambda: clk[0])
+    assert not res['ok'] and res['reason'] == 'no_pose'
+
+    class OkTruth:
+        def pose(self, max_age_s=1.0):
+            return (0.1, 0.1, 0.0)
+
+    seq = [dict(ok=False, reason='fail_timeout', pose=None),
+           dict(ok=True, reason='done', pose=(0.0, 0.0, 0.0))]
+    res = home_once(OkTruth(), object(), {'floor_tags': {}},
+                    homing_fn=lambda *a, **k: seq.pop(0))
+    assert res['ok'] and not seq   # リトライ1回で成功・2回呼ばれた
