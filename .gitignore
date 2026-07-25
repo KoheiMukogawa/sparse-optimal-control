@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# WSL/Windows のメタデータ
+*:Zone.Identifier
+
+# 大容量の作業用動画（docs/tags は193MB規模）
+*.mp4

@@ -1,7 +1,45 @@
-# Handoff - 2026-07-20
+# Handoff - 2026-07-22
 
 過去セッション（2026-06-12〜2026-07-15）の全文は
 `docs/作業記録/handoff_archive.md` に退避（必要時のみ参照）。
+
+## 2026-07-22 セッション16（SDカード書き込み成功・Pi起動せず＝EEPROM疑い/未完）
+
+- **書き込み失敗の真犯人＝特定のUSBカードリーダー**（切り分け完了）:
+  - そのリーダーは**読み30GBは完走するが、書き込みは毎回きっかり約1.4GB
+    （1519583232 bytes）でデバイス脱落**（dmesg: `detected capacity change
+    ... to 0`→再認識失敗ループ）。64GB・32GBの**2枚とも同一挙動**＝カードは無罪
+  - **セルフパワーハブでも改善せず＝ハブ電力は無罪**（昨夜の仮説は否定）
+  - **別のリーダーに替えたら書き込み成功**。＝元リーダーの書き込み回路の問題
+    （負荷時の電力/信号。Anker 655 USB-Cハブ × Laptop Go Type-C との相性も一因かも）。
+    **今後イメージ書き込みは「動いた方のリーダー」を使う**
+- **イメージ書き込み成功**: Etcherで64GBカードに書いてValidate緑・32GBにも焼き直し。
+  `~/sd_rescue.img`（fsck済clean）と複製 `C:\Users\mukou\sd_rescue.img` 両方健在
+- **イメージ内容は健全と検証済み**（WSLから起動せず確認）:
+  - FATブート: fsck.vfatクリーン・602ファイル、`start4.elf`/`vmlinuz`(10.5MB)/
+    `initrd.img`(45.8MB)/`bcm2711-rpi-4-b.dtb` 全て非ゼロ、U-Boot構成
+  - ルートext4: **ラベル=`writable`**（cmdlineの`root=LABEL=writable`と一致）・
+    **state=clean**・`Last mounted on: /`。＝カードの中身は問題なし
+- **しかしPiがどちらのカードでも起動しない**: HDMIは`hdmi_safe=1`でも完全無信号・
+  **PWR赤/ACT緑とも点きっぱなし（点滅なし）**・SSH不可（LAN上に22番なし）。
+  2枚の検証済みカードで同一症状 → **原因はPi本体**。7-20の電源断が
+  **Pi4のEEPROMブートローダー（基板SPI ROM）も壊した**が最有力
+  （EEPROM破損＝どのカードでも起動不可・HDMI無信号・LED点灯の典型）
+- **EEPROM recovery カードを焼き付け済み**（Imager → Misc utility images →
+  Bootloader (Pi4/400) → SD Card Boot）。**未テスト＝ライトローバーが手元に無いため**
+- **次回やること（本体が戻ったら）**:
+  1. **EEPROM recoveryカードで起動**（AC給電）。成功＝緑ACTが高速点滅/HDMI緑。
+     10秒待って電源OFF
+  2. recoveryカードを抜き、**rescueカード（32GB・我々の修復イメージ）**を挿して起動。
+     32GBは「このPiで起動実績のある実績カード」なので優先（64GBはPiスロット相性の
+     懸念あり・かつgrowpart要）。起動確認: HDMI or `ssh mukougawakouhei@192.168.0.32`
+  3. **recoveryしても無反応（LED不変）→ Pi基板/電源のハード故障**。新しいPi4が必要
+     （でもrescueカードを挿すだけでシステム完全復元できる。イメージは安全に保管済み）
+  4. 起動できたら: 64GB利用時のみ `growpart /dev/mmcblk0 2`→`resize2fs
+     /dev/mmcblk0p2`（32GBは不要）→ nav_base単独→サーベイ→スモーク2本→外乱バッチ
+  5. `/etc/sudoers.d/sd-repair` を復旧完了後に削除（`sudo rm /etc/sudoers.d/sd-repair`）
+- **教訓**: 研究システムはイメージ2本で完全保全済み。最悪Pi本体が死んでも
+  新Pi4にカードを挿せば復元可能＝データ喪失リスクは無い
 
 ## 2026-07-20 セッション15（RPi SDカード破損・復旧作業/未完）
 
