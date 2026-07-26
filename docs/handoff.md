@@ -53,10 +53,20 @@
     一致することをテストで検証＝転記ミス防止）
   - **図の言語は日本語**（japanize）。S1・S2・S6 の3図は英語のままなので最終版で要統一。
     配色・ラベルは `rover/fig_style.py` に集約済みなので1か所直せば済む
-- テスト 71→**97本 all green**（`test_sweep_grid.py` 6・`test_sweep_delay.py` 4・
-  `test_openloop_sparse.py` 4・`test_thesis_data.py` 12）
-- 次: 実機は R0 待ち。sim 側の残りは **S12（real/sim散布図・1時間）**。
-  第2章の執筆は図2.1〜2.5 が揃ったので着手可能。
+- **S12 も実施（図5.7 real vs sim）**: `thesis_data.real_vs_sim` ＋ `fig5_7`。
+  - **既刊 batch_compare.md 知見2 の「全4条件・全指標で概ね10%以内」は RMSE について
+    不正確だった**。全16組を計算し直すと Σ|u|・ω0率・反転は ±7%以内で一致するが、
+    **RMSE は実機が sim より悪い側へ +11.8〜+20.8%**（Kanayama のみ +0.6%）。
+    → batch_compare.md に訂正を追記し、outline 5.9節も書き換えた
+  - ただし **RMSE の絶対差は全条件 0.4cm 以内**（相対差が大きいのは MPC系の RMSE が
+    元々1.5〜3cm と小さいため）。**「sim が当てたのは入力の打ち方であって
+    追従精度の絶対値ではない」**と区別して書けば主張は弱まらない
+- テスト 71→**102本 all green**（`test_sweep_grid.py` 6・`test_sweep_delay.py` 4・
+  `test_openloop_sparse.py` 4・`test_thesis_data.py` 17）
+- **表B の ★★★ は全て完了**。残りは補強項目（S3・S4・S5・S7・S8・S10・S11）のみ。
+- 次: 実機は R0 待ち。**実機なしでできる主要作業は終わった**ので、
+  **第2章の執筆**（図2.1〜2.5 が揃っている）か、図の言語統一
+  （S1・S2・S6 の3図が英語のまま。`rover/fig_style.py` を直して再実行で3分）。
 
 ## 2026-07-25 セッション17（卒論の詳細章立てを作成）
 

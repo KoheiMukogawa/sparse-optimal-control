@@ -139,6 +139,42 @@ def external_by_condition(ext):
     return out
 
 
+COMPARE_METRICS = ["rmse_cm", "sum_u", "w_zero_ratio", "flips"]
+
+METRIC_LABEL = {
+    "rmse_cm": "追従 RMSE [cm]",
+    "sum_u": "Σ|u|（操舵量）",
+    "w_zero_ratio": "ω0率",
+    "flips": "ω符号反転 [回]",
+}
+
+
+def real_vs_sim(real_agg, sim_agg, metrics=COMPARE_METRICS):
+    """実機と sim の条件平均を突き合わせる（図5.7 用）。
+
+    rel_diff は sim を基準にした相対差 (real - sim) / sim。
+    sim が 0（反転0対0など）のときは比が定義できないので None を返す。
+    """
+    pairs = []
+    for cond in CONDITIONS:
+        if cond not in real_agg or cond not in sim_agg:
+            continue
+        for m in metrics:
+            s = sim_agg[cond][m]["mean"]
+            r = real_agg[cond][m]["mean"]
+            if s is None or r is None:
+                continue
+            pairs.append({
+                "cond": cond,
+                "metric": m,
+                "sim": s,
+                "real": r,
+                "abs_diff": r - s,
+                "rel_diff": None if s == 0 else (r - s) / s,
+            })
+    return pairs
+
+
 def radar_axes(agg, ext):
     """レーダー用に5軸を (0,1] （大きいほど良い）へ正規化する。
 

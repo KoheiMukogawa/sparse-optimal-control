@@ -113,3 +113,57 @@ def test_percentile_uses_the_same_definition_as_recorded_metrics():
     assert percentile(xs, 50) == _pct(sorted(xs), 0.50)
     assert percentile(xs, 95) == _pct(sorted(xs), 0.95)
     assert percentile(xs, 50) == 3  # 線形補間なら 2.5 になる
+
+
+# --- 図5.7: real vs sim の対比（S12） -------------------------------------
+
+SIM = "results/2026-07-15_Lturn_3way_sim"
+
+
+@pytest.fixture(scope="module")
+def pairs():
+    from thesis_data import aggregate_runs, load_runs, real_vs_sim
+    real = aggregate_runs(load_runs(f"{REAL}/runs.csv"))
+    sim = aggregate_runs(load_runs(f"{SIM}/runs.csv"))
+    return real_vs_sim(real, sim)
+
+
+def test_pairs_cover_four_conditions_times_four_metrics(pairs):
+    assert len(pairs) == 16
+    assert {p["metric"] for p in pairs} == {
+        "rmse_cm", "sum_u", "w_zero_ratio", "flips"}
+
+
+def test_effort_and_sparsity_and_chatter_agree_within_seven_percent(pairs):
+    """機序の裏付けとして効く3指標は sim と実機がよく一致する。"""
+    for p in pairs:
+        if p["metric"] == "rmse_cm" or p["rel_diff"] is None:
+            continue
+        assert abs(p["rel_diff"]) < 0.07, f"{p['cond']} {p['metric']}"
+
+
+def test_rmse_relative_gap_exceeds_ten_percent_for_mpc_conditions(pairs):
+    """既刊 batch_compare.md の「全指標10%以内」は RMSE では成り立たない。
+
+    実機の方が悪い側にずれる。この事実を figure と本文で正直に書くための固定。
+    """
+    rmse = {p["cond"]: p for p in pairs if p["metric"] == "rmse_cm"}
+    assert abs(rmse["kanayama"]["rel_diff"]) < 0.01
+    for cond in ("l2", "l1", "l1_ms2"):
+        assert rmse[cond]["rel_diff"] > 0.10, cond
+
+
+def test_rmse_absolute_gap_is_small_for_every_condition(pairs):
+    """相対差が大きいのは基準値が小さいためで、絶対差は 0.4cm 以内に収まる。"""
+    for p in pairs:
+        if p["metric"] != "rmse_cm":
+            continue
+        assert abs(p["abs_diff"]) < 0.4, f"{p['cond']}: {p['abs_diff']}"
+
+
+def test_zero_flip_conditions_have_no_relative_difference(pairs):
+    """反転0対0は比が定義できないので None にする（0除算で落とさない）。"""
+    flips = {p["cond"]: p for p in pairs if p["metric"] == "flips"}
+    assert flips["l2"]["sim"] == 0 and flips["l2"]["real"] == 0
+    assert flips["l2"]["rel_diff"] is None
+    assert flips["l1_ms2"]["rel_diff"] == pytest.approx(0.0)

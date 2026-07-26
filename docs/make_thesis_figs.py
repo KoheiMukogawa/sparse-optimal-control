@@ -6,6 +6,7 @@
 
 作る図:
   図5.6  対策前後の ω(t)（l1 vs l1_ms2）
+  図5.7  sim と実機の対応（±10% 帯つき散布図・相対差）
   図6.2  条件別の RMSE と Σ|u|（誤差棒つき）
   図6.3  4条件の ω(t) 並置
   図6.4  求解時間の分布（箱ひげ）
@@ -30,11 +31,13 @@ import numpy as np
 import fig_style as FS
 from fig_style import plt
 from plot_lturn import V_ACTIVE, W_DEAD, load
-from thesis_data import (CONDITIONS, RADAR_AXES, aggregate_runs,
-                         external_by_condition, load_external, load_runs,
-                         load_solve_ms)
+from thesis_data import (COMPARE_METRICS, CONDITIONS, RADAR_AXES,
+                         aggregate_runs, external_by_condition, load_external,
+                         load_runs, load_solve_ms, real_vs_sim)
+from thesis_data import METRIC_LABEL as TD_METRIC_LABEL
 
 REAL = "results/2026-07-15_Lturn_3way_real"
+SIM = "results/2026-07-15_Lturn_3way_sim"
 
 
 # ---------------------------------------------------------------- データ補助
@@ -80,6 +83,76 @@ def fig5_6(agg, outdir):
     fig.suptitle("図5.6  移動抑制の導入によるチャタリングの消失（実機・各代表1本）")
     fig.tight_layout()
     return _save(fig, outdir, "fig5_6_omega_before_after.png")
+
+
+METRIC_MARKER = {"rmse_cm": "o", "sum_u": "s", "w_zero_ratio": "^",
+                 "flips": "D"}
+
+
+def fig5_7(pairs, outdir):
+    """図5.7 sim が実機をどこまで当てたか。当たった指標と外れた指標を分けて示す。"""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.4, 4.6))
+
+    # 左: 対数散布図（±10% 帯つき）。反転0対0は対数軸に載らないので除く。
+    plotted = [p for p in pairs if p["sim"] > 0 and p["real"] > 0]
+    lo = min(min(p["sim"], p["real"]) for p in plotted) * 0.6
+    hi = max(max(p["sim"], p["real"]) for p in plotted) * 1.6
+    line = np.logspace(math.log10(lo), math.log10(hi), 50)
+    ax1.fill_between(line, line * 0.9, line * 1.1, color="0.75", alpha=0.45,
+                     label="±10% 帯", zorder=0)
+    ax1.plot(line, line, "k--", lw=0.9, label="完全一致", zorder=1)
+
+    seen_m, seen_c = set(), set()
+    for p in plotted:
+        ax1.plot(p["sim"], p["real"], METRIC_MARKER[p["metric"]], ms=8,
+                 color=FS.COLOR[p["cond"]], markeredgecolor="0.2",
+                 markeredgewidth=0.6, zorder=3)
+        seen_m.add(p["metric"])
+        seen_c.add(p["cond"])
+    ax1.set_xscale("log")
+    ax1.set_yscale("log")
+    ax1.set_xlim(lo, hi)
+    ax1.set_ylim(lo, hi)
+    ax1.set_xlabel("シミュレーション（遅延2step）")
+    ax1.set_ylabel("実機（n=3 平均）")
+    ax1.set_title("sim と実機の対応（両対数）", fontsize=10)
+    handles = [plt.Line2D([], [], ls="", marker=METRIC_MARKER[m], color="0.35",
+                          ms=7, label=TD_METRIC_LABEL[m])
+               for m in COMPARE_METRICS if m in seen_m]
+    handles += [plt.Line2D([], [], ls="", marker="o", color=FS.COLOR[c], ms=7,
+                           label=FS.SHORT[c]) for c in CONDITIONS if c in seen_c]
+    handles += [plt.Line2D([], [], ls="--", color="k", lw=0.9, label="完全一致"),
+                plt.Rectangle((0, 0), 1, 1, color="0.75", alpha=0.45,
+                              label="±10% 帯")]
+    ax1.legend(handles=handles, fontsize=7, loc="upper left", ncol=2)
+
+    # 右: 相対差。RMSE だけが帯から外れることを見せる。
+    xs, labels = [], []
+    for i, m in enumerate(COMPARE_METRICS):
+        for p in [q for q in pairs if q["metric"] == m]:
+            if p["rel_diff"] is None:
+                continue
+            ax2.plot(i, p["rel_diff"] * 100, METRIC_MARKER[m], ms=9,
+                     color=FS.COLOR[p["cond"]], markeredgecolor="0.2",
+                     markeredgewidth=0.6, zorder=3)
+        xs.append(i)
+        labels.append(TD_METRIC_LABEL[m])
+    ax2.axhspan(-10, 10, color="0.75", alpha=0.45, zorder=0, label="±10% 帯")
+    ax2.axhline(0, color="k", ls="--", lw=0.9, zorder=1)
+    ax2.set_xticks(xs)
+    ax2.set_xticklabels(labels, fontsize=8)
+    ax2.set_ylabel("相対差 (実機 − sim) / sim [%]")
+    ax2.set_title("指標ごとの相対差", fontsize=10)
+    ax2.legend(fontsize=8, loc="upper right")
+
+    fig.suptitle("図5.7  シミュレーションの予測性（2026-07-15 L字バッチ）")
+    fig.text(0.01, -0.03,
+             "操舵量・ω0率・反転は ±7% 以内で一致するが、追従 RMSE は実機が "
+             "12〜21% 悪い側にずれる（絶対差は全条件 0.4cm 以内）。"
+             "反転が 0 対 0 の Kanayama・L2 は左図（対数軸）から除いている。",
+             fontsize=8, va="top")
+    fig.tight_layout()
+    return _save(fig, outdir, "fig5_7_real_vs_sim.png")
 
 
 def fig6_2(agg, outdir):
@@ -263,6 +336,7 @@ def fig6_8(agg, ext, outdir):
 def main():
     ap = argparse.ArgumentParser(description="卒論 第5・6章の図を作る")
     ap.add_argument("--batch", default=REAL)
+    ap.add_argument("--sim-batch", default=SIM)
     ap.add_argument("--outdir", default="results/2026-07-26_thesis_figs")
     args = ap.parse_args()
 
@@ -273,9 +347,14 @@ def main():
     ext = load_external(os.path.join(args.batch, "external.csv"))
     agg = aggregate_runs(runs)
 
+    sim_agg = aggregate_runs(load_runs(os.path.join(args.sim_batch, "runs.csv")))
+    pairs = real_vs_sim(agg, sim_agg)
+
     print(f"入力: {args.batch}（{len(runs)}走行・外部計測{len(ext)}点）")
+    print(f"      {args.sim_batch}（sim 基準）")
     print(f"出力: {args.outdir}")
     fig5_6(agg, args.outdir)
+    fig5_7(pairs, args.outdir)
     fig6_2(agg, args.outdir)
     fig6_3(agg, args.outdir)
     fig6_4(agg, args.outdir)
