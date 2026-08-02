@@ -14,3 +14,6 @@ wheels/
 
 # 大容量の作業用動画（docs/tags は193MB規模）
 *.mp4
+
+# 生成物（docs/build_thesis_html.py で再生成できる）
+docs/thesis/thesis.html
