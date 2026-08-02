@@ -347,9 +347,9 @@ $L^1$ 正則化が penalize しているのは補正 $\delta u$ である。
 | 番号 | 内容 | 状態 |
 |---|---|---|
 | 表7.1 | 提案手法が買っているもの／払っているもの | 第6章から作表 |
-| 図7.1 | 遅延と切替制御の限界振動の概念図 | **要作図**（模式図） |
+| 図7.1 | 遅延と切替制御の限界振動の概念図 | **取得済み** `results/2026-08-02_thesis_figs2/fig7_1_limit_cycle.png` |
 | 表7.2 | 「sim で設計 → 実機で確認」の適用実績 | `docs/handoff.md` から作表 |
-| 図7.2 | $\lambda=2$ の RMSE が遅延 2 step でのみ落ち込む様子 | **要作図**（データは `results/2026-07-26_delay_sweep/delay.csv`） |
+| 図7.2 | $\lambda=2$ の RMSE が遅延 2 step でのみ落ち込む様子 | **取得済み** `results/2026-08-02_thesis_figs2/fig7_2_apparent_optimum.png` |
 | 表7.3 | odom 基準と真値基準で結論が変わった事例 | `2026-06-13_floor_compare.md`、`2026-07-15_Lturn_batch_compare.md` |
 
 ## 著者が確認・補完すべき箇所

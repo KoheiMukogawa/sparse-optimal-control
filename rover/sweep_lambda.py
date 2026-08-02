@@ -9,6 +9,11 @@
 
 実行: uv run python rover/sweep_lambda.py
       uv run python rover/sweep_lambda.py --lams 0.5,1,2,5,10,20 --horizon 15
+
+    **卒論 表5.3・図5.2 を再現するときは必ず λ を明示すること**:
+      uv run python rover/sweep_lambda.py --lams 0.25,0.5,0.75,1,1.5,2,3
+    既定値（0.5〜50）は破綻域を広く見るための探索用で、既刊の表とは別物である。
+    引数なしで再実行すると results/2026-06-13_lambda_sweep/ を別条件で上書きする。
 出力: results/2026-06-13_lambda_sweep/{table.md, sweep.csv, tradeoff.png}
 """
 
@@ -171,31 +176,33 @@ def _write_outputs(rows, outdir, horizon):
     # Plot（matplotlib があれば）
     png_path = os.path.join(outdir, "tradeoff.png")
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+        import fig_style as FS
+        from fig_style import plt
+        FS.setup()
         # 到達したものだけを曲線に（破綻λは点数膨張でΣ|δu|が無意味）
         l1 = [(lam, a) for reg, lam, a in rows if reg == "L1" and a["all_ok"]]
         l2 = rows[0][2]
         xs = [a["abs_du"] for _, a in l1]
         ys = [a["rmse_cm"] for _, a in l1]
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.plot(xs, ys, "o-", label="L1-MPC (reached)")
+        fig, ax = plt.subplots(figsize=(6.4, 4.4))
+        ax.plot(xs, ys, marker="o", markersize=6, linewidth=2,
+                color=FS.COLOR["l1"], label="L1-MPC（到達した λ）")
         for (lam, a) in l1:
             ax.annotate(f"λ={lam:g}", (a["abs_du"], a["rmse_cm"]),
-                        textcoords="offset points", xytext=(4, 4), fontsize=8)
-        ax.plot([l2["abs_du"]], [l2["rmse_cm"]], "s", color="crimson",
-                markersize=9, label=f"L2 baseline")
+                        textcoords="offset points", xytext=(5, 5), fontsize=8,
+                        color=FS.INK)
+        ax.plot([l2["abs_du"]], [l2["rmse_cm"]], marker="s",
+                color=FS.COLOR["l2"], markersize=9, linestyle="none",
+                label="L2-MPC（ベースライン）")
         ax.annotate("L2", (l2["abs_du"], l2["rmse_cm"]),
-                    textcoords="offset points", xytext=(4, -10), fontsize=8,
-                    color="crimson")
-        ax.set_xlabel("control effort  sum|du|  (energy proxy)")
-        ax.set_ylabel("cross-track RMSE [cm]")
-        ax.set_title("Effort-Accuracy trade-off (lower-left is better)")
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+                    textcoords="offset points", xytext=(5, -12), fontsize=8,
+                    color=FS.INK)
+        ax.set_xlabel("入力積算 Σ|δu|（消費エネルギーの代理指標）")
+        ax.set_ylabel("横偏差 RMSE [cm]")
+        ax.set_title("図5.2　スパース性と追従精度のトレードオフ\n（左下ほど良い・遅延なし sim）")
+        ax.legend(frameon=False)
         fig.tight_layout()
-        fig.savefig(png_path, dpi=120)
+        fig.savefig(png_path)
         print(f"\n出力: {md_path}\n      {csv_path}\n      {png_path}")
     except ImportError:
         print(f"\n出力: {md_path}\n      {csv_path}\n      (matplotlib なし→png省略)")

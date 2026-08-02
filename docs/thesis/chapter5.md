@@ -563,10 +563,10 @@ $w_{ms} = 0.5$ が選ばれるが、これは遅延 4 ステップで破綻す�
 | 番号 | 内容 | 状態 |
 |---|---|---|
 | 表5.1 | 単体ベンチによる求解時間（$N = 5 \sim 30$） | `results/2026-06-13_rpi_bench/` |
-| 図5.1 | $N$ 対求解時間（L1/L2、100 ms 判定線つき） | **要作図**（データは表5.1） |
+| 図5.1 | $N$ 対求解時間（L1/L2、100 ms 判定線つき） | **取得済み** `results/2026-08-02_thesis_figs2/fig5_1_solve_vs_N.png` |
 | 表5.2 | 単体ベンチと実走行下の求解時間の比較 | 本節から作表 |
 | 表5.3 | $\lambda$ スイープ（遅延なし） | `results/2026-06-13_lambda_sweep/table.md` |
-| 図5.2 | $\lambda$ トレードオフ曲線 | `.../tradeoff.png`（**英語ラベル・要和訳**） |
+| 図5.2 | $\lambda$ トレードオフ曲線 | **取得済み** `.../tradeoff.png`（日本語化済み） |
 | 表5.3b | $\lambda \times w_{ms}$ グリッド抜粋 | `results/2026-07-26_lambda_ms_grid/table.md` |
 | 表5.4 | 空転・直線での比較 | `2026-06-13_spin_compare.md`、`..._floor_compare.md` |
 | 表5.5 | L 字の 4 指標（n=1） | `2026-06-13_Lturn_compare.md` A 節 |
@@ -574,16 +574,16 @@ $w_{ms} = 0.5$ が選ばれるが、これは遅延 4 ステップで破綻す�
 | 図5.3 | 3 手法の軌跡・$\omega(t)$・チャタ拡大 | `results/2026-06-13_Lturn_plot.png` |
 | 表5.7 | チャタリング診断指標 | `2026-06-13_Lturn_compare.md` B 節 |
 | 表5.8 | 遅延スイープ（0〜4 step） | `results/2026-07-26_delay_sweep/table.md` |
-| 図5.4 | 遅延に対する各指標の推移 | `.../delay_sweep.png`（**英語ラベル・要和訳**） |
+| 図5.4 | 遅延に対する各指標の推移 | **取得済み** `.../delay_sweep.png`（日本語化済み） |
 | 表5.9 | 移動抑制スイープ（遅延 2 step） | `results/2026-07-26_lambda_ms_grid/` |
 | 表5.9b | 遅延マージンの比較（$w_{ms}$ 0.5 対 2.0） | `results/2026-07-26_delay_sweep/table.md` |
-| 図5.5 | $w_{ms}$ に対する各指標の変化 | `.../sweep_ms.png`（**英語ラベル・要和訳**） |
+| 図5.5 | $w_{ms}$ に対する各指標の変化 | **取得済み** `.../sweep_ms.png`（日本語化済み） |
 | 表5.10 | 実機バッチ n=3 の指標 | `2026-07-15_Lturn_3way_real/summary.md` |
 | 図5.6 | 対策前後の $\omega(t)$ 実機波形 | `results/2026-07-26_thesis_figs/fig5_6_*.png` |
 | 表5.11 | 外部計測による終点誤差（n=3） | `.../external.csv` |
 | 表5.12 | 実機と sim の相対差（16 組） | `results/2026-07-26_thesis_figs/notes.md` |
 | 図5.7 | real vs sim 散布図（±10 % 帯つき） | `.../fig5_7_real_vs_sim.png` |
-| 図5.8 | 問題 → 原因 → 対策 → 検証 の総括図 | **要作図**（模式図） |
+| 図5.8 | 問題 → 原因 → 対策 → 検証 の総括図 | **取得済み** `results/2026-08-02_thesis_figs2/fig5_8_summary.png` |
 
 ## 著者が確認・補完すべき箇所
 

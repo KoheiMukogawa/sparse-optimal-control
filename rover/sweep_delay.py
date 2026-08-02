@@ -83,31 +83,46 @@ def write_outputs(rows, outdir):
 def _plot(rows, png_path):
     """遅延軸に対する4指標を条件ごとに描く（論文 図5.4 の元）。"""
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+        import fig_style as FS
+        from fig_style import plt
     except ImportError:
         return
+    FS.setup()
 
-    panels = [("flips", "omega sign flips", 1.0),
-              ("sum_u", "sum|u| (energy proxy)", 1.0),
-              ("rmse", "cross-track RMSE [cm]", 1.0),
-              ("zero", "omega zero ratio [%]", 100.0)]
+    panels = [("flips", "ω 符号反転 [回]", 1.0),
+              ("sum_u", "入力積算 Σ|u|", 1.0),
+              ("rmse", "横偏差 RMSE [cm]", 1.0),
+              ("zero", "ω ゼロ率 [%]", 100.0)]
     names = list(dict.fromkeys(r["name"] for r in rows))
-    fig, axes = plt.subplots(2, 2, figsize=(9, 6))
+    fig, axes = plt.subplots(2, 2, figsize=(9, 6.4))
     for ax, (key, label, scale) in zip(axes.ravel(), panels):
         for name in names:
             series = sorted((r for r in rows if r["name"] == name),
                             key=lambda r: r["delay_steps"])
             ax.plot([r["delay_steps"] for r in series],
-                    [r[key] * scale for r in series], "o-", label=name)
-        ax.set_xlabel("input delay [steps of 0.1 s]")
+                    [r[key] * scale for r in series],
+                    color=FS.DELAY_COLOR.get(name),
+                    linestyle=FS.DELAY_LINESTYLE.get(name, "-"),
+                    marker=FS.DELAY_MARKER.get(name, "o"),
+                    markersize=5, linewidth=2,
+                    label=FS.DELAY_LABEL.get(name, name))
+        ax.set_xlabel("入力遅延 [ステップ（1 step = 0.1 s）]")
         ax.set_ylabel(label)
-        ax.grid(True, alpha=0.3)
-    axes[0][0].legend(fontsize=7)
-    fig.suptitle("Delay tolerance by controller (L-turn course)")
-    fig.tight_layout()
-    fig.savefig(png_path, dpi=120)
+        ax.set_xticks(sorted({r["delay_steps"] for r in rows}))
+    # 実機の推定遅延（約200ms=2step）を全パネルに引く
+    for ax in axes.ravel():
+        ax.axvline(2, color=FS.INK_MUTED, linestyle=":", linewidth=1.2,
+                   zorder=0)
+    # 注記は最も空いているパネル（RMSE・遅延2step付近は低い値のみ）に置く
+    axes[1][0].annotate("実機の推定遅延", xy=(2, 0.97),
+                        xycoords=("data", "axes fraction"),
+                        ha="center", va="top", fontsize=8, color=FS.INK_MUTED)
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=3, fontsize=8,
+               frameon=False, bbox_to_anchor=(0.5, -0.02))
+    fig.suptitle("図5.4　入力遅延に対する各条件の耐性（L字経路・sim）")
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.savefig(png_path)
     plt.close(fig)
 
 

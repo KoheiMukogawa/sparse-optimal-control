@@ -734,23 +734,25 @@
 |---|---|---|
 | 図1.1 | LiteRover 外観 | 【未取得】撮影が必要 |
 | 図1.2 | L2 vs L1 入力の模式図 | 既存 `docs/論文解説_figs/fig_compare.png` |
-| 図1.3 | 本研究の論理の流れ | 新規作図 |
+| 図1.3 | 本研究の論理の流れ | **取得済み** `results/2026-08-02_thesis_figs2/fig1_3_logic_flow.png` |
 | 図2.1〜2.4 | 誤差幾何・ノルム・bang-off-bang・軟しきい値 | 既存 `docs/論文解説_figs/` 4点 |
 | 図2.5 | オープンループ 78% ゼロ | **取得済み** `results/2026-07-26_openloop_bangoffbang/bangoffbang.png` |
 | 図2.6 | オープンループ vs L1-MPC | 新規作図 |
-| 図3.1〜3.3 | コスト1行対比・移動抑制の作用・ノード構成 | 新規作図 |
-| 図4.1〜4.3 | システム構成・実験環境写真・モジュール構成 | 写真【未取得】、他は新規作図 |
+| 図3.1〜3.3 | コスト1行対比・移動抑制の作用・ノード構成 | **取得済み** `results/2026-08-02_thesis_figs2/fig3_{1,2,3}_*.png` |
+| 図4.1・4.3 | システム構成・モジュール構成 | **取得済み** `results/2026-08-02_thesis_figs2/fig4_{1,3}_*.png` |
+| 図4.2 | 実験環境写真 | **【未取得】** 実機復旧後に撮影（R15） |
 | 図4.4 | odom vs 真値 軌跡 | 既存 `results/2026-07-16_Lturn_1m_smoke2/traj_odom_vs_truth.png` |
-| 図4.5〜4.10 | 計測幾何・検出例・タグ配置良否・サーベイ・homing・バッチ | 一部【未取得】（検出例画像）、他は新規作図 |
-| 図5.1 | N 対求解時間 | **要作図**（データは `results/2026-06-13_rpi_bench/` にあり） |
-| 図5.2 | λ トレードオフ曲線 | 既存 `results/2026-06-13_lambda_sweep/tradeoff.png` |
+| 図4.5・4.7〜4.10 | 計測幾何・タグ配置良否・サーベイ・homing・バッチ | **取得済み** `results/2026-08-02_thesis_figs2/fig4_*.png` |
+| 図4.6 | 俯瞰画像上のタグ検出例 | **取得済み** `.../fig4_6_detection.png`（元画像は未追跡） |
+| 図5.1 | N 対求解時間 | **取得済み** `results/2026-08-02_thesis_figs2/fig5_1_solve_vs_N.png` |
+| 図5.2 | λ トレードオフ曲線 | **取得済み** `.../tradeoff.png`（2026-08-02 日本語化・要再現引数あり） |
 | 図5.3 | L字 3手法の軌跡・ω(t) | 既存 `results/2026-06-13_Lturn_plot.png` |
-| 図5.4 | 遅延スイープ | **取得済み** `results/2026-07-26_delay_sweep/delay_sweep.png`（論文品質での作り直しは要） |
-| 図5.5 | move_suppress スイープ | **取得済み** `results/2026-07-26_lambda_ms_grid/sweep_ms.png`（同上） |
+| 図5.4 | 遅延スイープ | **取得済み** `.../delay_sweep.png`（2026-08-02 日本語化・論文品質） |
+| 図5.5 | move_suppress スイープ | **取得済み** `.../sweep_ms.png`（2026-08-02 日本語化・論文品質） |
 | 図5.6 | 対策前後の実機 ω(t) | **取得済み** `results/2026-07-26_thesis_figs/fig5_6_omega_before_after.png` |
 | 図5.7 | real vs sim 散布図 | **取得済み** `results/2026-07-26_thesis_figs/fig5_7_real_vs_sim.png` |
-| 図5.8 | 本章総括図 | 新規作図（模式図） |
-| 図6.1 | 経路形状と座標定義 | 新規作図（模式図・データ不要） |
+| 図5.8 | 本章総括図 | **取得済み** `results/2026-08-02_thesis_figs2/fig5_8_summary.png` |
+| 図6.1 | 経路形状と座標定義 | **取得済み** `results/2026-08-02_thesis_figs2/fig6_1_course.png` |
 | 図6.2 | RMSE と Σ\|u\| の棒グラフ | **取得済み** `.../fig6_2_rmse_sumu.png` |
 | 図6.3 | 4条件の ω(t) 並置 | **取得済み** `.../fig6_3_omega_all.png` |
 | 図6.4 | 求解時間の箱ひげ | **取得済み** `.../fig6_4_solve_time.png` |
@@ -758,8 +760,8 @@
 | 図6.6 | odom と真値の乖離 | **取得済み** `.../fig6_6_odom_vs_truth.png` |
 | 図6.7 | 積載に対する指標推移 | **【未取得】**（R1） |
 | 図6.8 | 総合レーダーチャート | **取得済み** `.../fig6_8_radar.png` |
-| 図7.1 | 遅延と限界振動の概念図 | 新規作図 |
-| 図7.2 | λ=2 の見かけの最適（遅延2stepのみの谷） | **要作図**（データは `results/2026-07-26_delay_sweep/delay.csv`） |
+| 図7.1 | 遅延と限界振動の概念図 | **取得済み** `results/2026-08-02_thesis_figs2/fig7_1_limit_cycle.png` |
+| 図7.2 | λ=2 の見かけの最適（遅延2stepのみの谷） | **取得済み** `results/2026-08-02_thesis_figs2/fig7_2_apparent_optimum.png` |
 
 ---
 

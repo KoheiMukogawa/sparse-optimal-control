@@ -73,31 +73,43 @@ def write_outputs(rows, outdir, delay_steps):
 def _plot_ms(rows, png_path, delay_steps):
     """w_ms 軸に対する4指標の変化を λ 系列ごとに描く（論文 図5.5 の元）。"""
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+        import fig_style as FS
+        from fig_style import plt
     except ImportError:
         return
+    FS.setup()
 
-    panels = [("flips", "omega sign flips", 1.0),
-              ("sum_u", "sum|u| (energy proxy)", 1.0),
-              ("zero", "omega zero ratio [%]", 100.0),
-              ("rmse", "cross-track RMSE [cm]", 1.0)]
-    fig, axes = plt.subplots(2, 2, figsize=(9, 6))
+    panels = [("flips", "ω 符号反転 [回]", 1.0),
+              ("sum_u", "入力積算 Σ|u|", 1.0),
+              ("zero", "ω ゼロ率 [%]", 100.0),
+              ("rmse", "横偏差 RMSE [cm]", 1.0)]
+    lams = sorted({r["lam"] for r in rows})
+    # λ は順序量なので単一色相の濃淡で表す（カテゴリ色を割り当てない）
+    ramp = FS.lam_ramp(lams)
+    fig, axes = plt.subplots(2, 2, figsize=(9, 6.4))
     for ax, (key, label, scale) in zip(axes.ravel(), panels):
-        for lam in sorted({r["lam"] for r in rows}):
+        for lam in lams:
             series = sorted((r for r in rows if r["lam"] == lam),
                             key=lambda r: r["move_suppress"])
             ax.plot([r["move_suppress"] for r in series],
                     [r[key] * scale for r in series],
-                    "o-", label=f"lambda={lam:g}")
-        ax.set_xlabel("move_suppress  w_ms")
+                    color=ramp[lam], marker="o", markersize=5, linewidth=2,
+                    label=f"λ={lam:g}")
+        ax.set_xlabel("移動抑制重み $w_{ms}$")
         ax.set_ylabel(label)
-        ax.grid(True, alpha=0.3)
-    axes[0][0].legend(fontsize=8)
-    fig.suptitle(f"lambda x move_suppress under {delay_steps}-step input delay")
-    fig.tight_layout()
-    fig.savefig(png_path, dpi=120)
+        ax.set_xticks(sorted({r["move_suppress"] for r in rows}))
+    # 採用値 w_ms=2.0 を示す
+    for ax in axes.ravel():
+        ax.axvline(2.0, color=FS.INK_MUTED, linestyle=":", linewidth=1.2,
+                   zorder=0)
+    axes[0][0].annotate("採用値", xy=(2.0, 0.97), xycoords=("data", "axes fraction"),
+                        ha="center", va="top", fontsize=8, color=FS.INK_MUTED)
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=5, fontsize=9,
+               frameon=False, bbox_to_anchor=(0.5, -0.02))
+    fig.suptitle(f"図5.5　λ×移動抑制のグリッド（入力遅延 {delay_steps} ステップ下・sim）")
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.savefig(png_path)
     plt.close(fig)
 
 

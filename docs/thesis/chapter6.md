@@ -357,7 +357,7 @@ L2-MPC に対して追従精度で $0.37$ cm、終点精度で $8.5$ cm 及ば�
 | 番号 | 内容 | 状態 |
 |---|---|---|
 | 表6.1 | 実験条件 | `configs/batch_Lturn_3way.yaml`、`configs/path_L_turn.yaml` |
-| 図6.1 | 経路形状と座標定義 | **要作図**（模式図） |
+| 図6.1 | 経路形状と座標定義 | **取得済み** `results/2026-08-02_thesis_figs2/fig6_1_course.png` |
 | 表6.2 | 追従精度と操舵量（n=3） | `.../summary.md`、`runs.csv` |
 | 図6.2 | RMSE と $\Sigma|u|$ の棒グラフ（誤差棒つき） | `results/2026-07-26_thesis_figs/fig6_2_rmse_sumu.png` |
 | 表6.3 | スパース性・チャタ指標 | `runs.csv` |
