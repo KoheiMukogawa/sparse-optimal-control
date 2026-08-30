@@ -17,3 +17,14 @@ wheels/
 
 # 生成物（docs/build_thesis_html.py で再生成できる）
 docs/thesis/thesis.html
+
+# 他者の著作物（参考論文PDF）。リポジトリに入れない。
+data/paper/
+
+# 実機実験の生データ。未発表のため公開しない。
+results/
+
+# 院試・発表資料、実験中の写真
+# ("*:Zone.Identifier" は12行目に既存パターンがあるため重複追記しない)
+*.pdf
+*.jpg
