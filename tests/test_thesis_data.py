@@ -6,11 +6,19 @@
 """
 
 import math
+import pathlib
 
 import pytest
 
 from thesis_data import (CONDITIONS, aggregate_runs, load_external, load_runs,
                          radar_axes)
+
+RESULTS = pathlib.Path(__file__).parent.parent / "results"
+
+pytestmark = pytest.mark.skipif(
+    not RESULTS.exists(),
+    reason="実機の生データは未発表のため公開リポジトリには含まれない",
+)
 
 REAL = "results/2026-07-15_Lturn_3way_real"
 
