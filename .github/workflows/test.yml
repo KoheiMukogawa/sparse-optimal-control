@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v7  # v10 は存在しないタグ。浮動メジャータグは v7 までしか維持されていない（v8/v9/v10 なし）
         with:
           enable-cache: true
       - run: uv sync --frozen
