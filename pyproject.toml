@@ -23,3 +23,10 @@ package = false
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.pytest.ini_options]
+# rover/*_test.py・rover/spin_test.py はテストではなく `uv run python rover/xxx.py`
+# で実行するスクリプト（README参照）。rover/spin_test.py は rclpy（ROS2）に依存し、
+# pip 依存にないため pytest が収集すると ImportError になる。
+# 実際の pytest テストは tests/ 配下にのみ置く。
+testpaths = ["tests"]
