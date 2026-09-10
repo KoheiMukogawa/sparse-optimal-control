@@ -45,13 +45,16 @@ class MPCFollower:
     def __init__(self, N=15, ts=0.1, reg="l2", lam=1.0,
                  v_max=0.15, w_max=2.0,
                  q=(10.0, 10.0, 1.0), r=(1.0, 1.0), qf_scale=10.0,
-                 move_suppress=0.0):
+                 move_suppress=0.0, warm_start=True):
         self.N = N
         self.ts = ts
         self.reg = reg
         self.v_max = v_max
         self.w_max = w_max
         self.move_suppress = move_suppress
+        # warm_start=False は「前回解を使わない」対照条件。求解の重さが
+        # warm start の効きで説明できるか（6.4節・7.2節）を切り分けるために使う。
+        self.warm_start = warm_start
 
         nx, nu = 3, 2
         # --- パラメータ（毎ステップ更新） ---
@@ -96,6 +99,9 @@ class MPCFollower:
         self.du = du
         self.z = z
         self.last_solve_s = 0.0
+        # 直近求解の OSQP 反復回数。ms と違い機種に依存しないので、
+        # 実機なしでも「重さの理由」を議論できる量になる。
+        self.last_iters = 0
 
     def command(self, x_e, y_e, th_e, v_r, w_r=0.0):
         """現在の誤差と参照速度から最適な (v, ω) を返す。求解失敗時は None。"""
@@ -109,11 +115,14 @@ class MPCFollower:
             self.du_prev.value = self._last_du
         t0 = time.perf_counter()
         try:
-            self.prob.solve(solver=cp.OSQP, warm_start=True)
+            self.prob.solve(solver=cp.OSQP, warm_start=self.warm_start)
         except cp.error.SolverError:
             self.last_solve_s = time.perf_counter() - t0
+            self.last_iters = 0
             return None
         self.last_solve_s = time.perf_counter() - t0
+        stats = getattr(self.prob, "solver_stats", None)
+        self.last_iters = int(getattr(stats, "num_iters", 0) or 0)
         if self.du.value is None:
             return None
         dv, dw = self.du.value[:, 0]

@@ -70,7 +70,7 @@ def compute_metrics(twist, perr=(), solve_ms=()):
     )
 
 
-def _dist_to_polyline(waypoints, x, y):
+def dist_to_polyline(waypoints, x, y):
     """点 (x,y) から折れ線経路への最短距離 [m]。"""
     best = float('inf')
     for i in range(len(waypoints) - 1):
@@ -117,7 +117,7 @@ def truth_metrics(rows, waypoints, window_s=0.5):
               for px, py in waypoints]
     gx, gy = course[-1]
     agx, agy = waypoints[-1]
-    rmse = math.sqrt(sum(_dist_to_polyline(course, r[1], r[2]) ** 2
+    rmse = math.sqrt(sum(dist_to_polyline(course, r[1], r[2]) ** 2
                          for r in valid) / len(valid))
     return dict(truth_end_x=ex, truth_end_y=ey, truth_end_theta=eth,
                 truth_end_dist_cm=math.hypot(ex - gx, ey - gy) * 100.0,

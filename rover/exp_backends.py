@@ -22,7 +22,7 @@ from pathlib import Path
 
 import yaml
 
-from exp_metrics import compute_metrics
+from exp_metrics import compute_metrics, dist_to_polyline
 from follower_core import (clamp, goal_crossed, goal_scaled_vr, kanayama_cmd,
                            reference_pose, tracking_error)
 from mpc_core import MPCFollower
@@ -47,11 +47,27 @@ def load_path(path_file):
 
 
 def sim_run(cond, common, waypoints, v_r, sim_opts, timeout_s, seed):
-    """1本の閉ループsim。時系列と到達可否を返す。"""
+    """1本の閉ループsim。時系列と到達可否を返す。
+
+    外乱は3チャネルに分けてある（S4・6.7節）:
+      pos_noise/yaw_noise : 制御器に渡す観測姿勢に載る計測外乱（車体は無擾乱）
+      init_lat/init_yaw   : 開始姿勢の横ずれ・向きずれ（経路の外から始める）
+      gain_v/gain_w       : 指令に対する車体の実効ゲイン。積載増で「同じ指令でも
+                            進まない・回らない」状況をプラント側だけで模す
+                            （較正されていない感度解析であり、実機の積載量とは
+                            対応づけられていない）
+    真の追従誤差 terr は観測ノイズに汚れない量で、perr（制御器が見た横偏差）との
+    対比が実機の odom vs カメラ真値（6.6節）と同型になる。
+    """
     ts = 1.0 / float(common.get('rate', 10.0))
     delay = int(sim_opts.get('delay_steps', 2))
     pn = float(sim_opts.get('pos_noise', 0.0))
     yn = float(sim_opts.get('yaw_noise', 0.0))
+    init_lat = float(sim_opts.get('init_lat', 0.0))
+    init_yaw = float(sim_opts.get('init_yaw', 0.0))
+    gain_v = float(sim_opts.get('gain_v', 1.0))
+    gain_w = float(sim_opts.get('gain_w', 1.0))
+    warm_start = bool(sim_opts.get('warm_start', True))
     rng = random.Random(seed)
 
     mpc = None
@@ -60,11 +76,13 @@ def sim_run(cond, common, waypoints, v_r, sim_opts, timeout_s, seed):
                           reg=cond['controller'],
                           lam=float(cond.get('lam', 0.3)),
                           v_max=V_MAX, w_max=W_MAX,
-                          move_suppress=float(cond.get('move_suppress', 0.0)))
+                          move_suppress=float(cond.get('move_suppress', 0.0)),
+                          warm_start=warm_start)
 
-    x = y = th = t = 0.0
+    # 開始直線は +x 向きなので、横ずれは y 方向に載る
+    x, y, th, t = 0.0, init_lat, init_yaw, 0.0
     buf = deque()
-    twist, perr, solve_ms = [], [], []
+    twist, perr, terr, solve_ms, iters = [], [], [], [], []
     ok = False
     while t < timeout_s:
         gx, gy = waypoints[-1]
@@ -82,6 +100,7 @@ def sim_run(cond, common, waypoints, v_r, sim_opts, timeout_s, seed):
         if mpc is not None:
             cmd = mpc.command(x_e, y_e, th_e, vr, w_r=0.0)
             solve_ms.append(mpc.last_solve_s * 1e3)
+            iters.append(mpc.last_iters)
             if cmd is None:
                 break  # 求解失敗 → 未達で終了（実機の安全停止に対応）
         else:
@@ -92,12 +111,14 @@ def sim_run(cond, common, waypoints, v_r, sim_opts, timeout_s, seed):
         v, w = buf.popleft() if len(buf) > delay else (vr, 0.0)
         twist.append((t, v, w))
         perr.append((t, y_e))
-        # 真の非線形プラントを1ステップ
-        x += v * math.cos(th) * ts
-        y += v * math.sin(th) * ts
-        th += w * ts
+        terr.append((t, dist_to_polyline(waypoints, x, y)))
+        # 真の非線形プラントを1ステップ（実効ゲインはここだけに効く）
+        x += gain_v * v * math.cos(th) * ts
+        y += gain_v * v * math.sin(th) * ts
+        th += gain_w * w * ts
         t += ts
-    return dict(ok=ok, twist=twist, perr=perr, solve_ms=solve_ms)
+    return dict(ok=ok, twist=twist, perr=perr, terr=terr,
+                solve_ms=solve_ms, iters=iters, final=(x, y, th))
 
 
 class SimBackend:
