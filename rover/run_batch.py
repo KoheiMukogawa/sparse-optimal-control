@@ -33,6 +33,7 @@ CSV_COLUMNS = [
     'max_w', 'solve_p50', 'solve_p95', 'solve_max',
     'truth_end_x', 'truth_end_y', 'truth_end_theta',
     'truth_end_dist_cm', 'truth_end_dist_abs_cm', 'truth_rmse_cm',
+    'start_dx_cm', 'start_dy_cm', 'start_dtheta_deg',
     'bagdir', 'note',
 ]
 
@@ -159,6 +160,69 @@ def home_once(truth, sender, cfg, stop_event=None, homing_fn=None,
     return res
 
 
+def _ask_floats(input_fn, prompt, n, allow_blank=False):
+    """n 個（n が None なら1個以上）の数値を読む。不正なら読み直す。
+
+    実験中の打ち間違いでバッチを落とさないため、例外にせず聞き直す。
+    'q' は中断（KeyboardInterrupt）。
+    """
+    while True:
+        s = input_fn(prompt)
+        if s.strip().lower() == 'q':
+            raise KeyboardInterrupt
+        if allow_blank and not s.strip():
+            return [0.0] * n
+        try:
+            vals = [float(t) for t in s.replace(',', ' ').split()]
+        except ValueError:
+            print('  数値として読めません。入力し直してください')
+            continue
+        if n is not None and len(vals) != n:
+            print(f'  {n}個の数値が要ります（{len(vals)}個でした）')
+            continue
+        if n is None and not vals:
+            print('  1個以上の数値が要ります')
+            continue
+        return vals
+
+
+def read_manual_metrics(input_fn, waypoints):
+    """方眼の読み値をキーボードから読み、指標 dict と生データを返す。
+
+    カメラ俯瞰を置けない大学環境用（--manual）。戻り値 (metrics, raw)。
+    """
+    from exp_metrics import manual_metrics
+    start = _ask_floats(
+        input_fn, '  開始姿勢ズレ dx[cm] dy[cm] dθ[deg]（空Enterで 0 0 0）: ',
+        3, allow_blank=True)
+    end = _ask_floats(
+        input_fn, '  終点 x[cm] y[cm] θ[deg]: ', 3)
+    devs = _ask_floats(
+        input_fn, '  横偏差[cm] を10cm刻みでスペース区切り（左が正）: ', None)
+    raw = dict(devs_cm=devs, end_pose_cm=end, start_pose_cm=start)
+    return manual_metrics(devs, end, start, waypoints), raw
+
+
+def write_manual_readings(outdir, cond_name, rep, raw):
+    """手入力の生データを走行ごとに保存し、そのパスを返す（再解析用）。
+
+    key,value の平坦な1スキーマにする（後から DictReader で一括して読める）。
+    """
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    p = outdir / f'manual_{cond_name}_r{rep}.csv'
+    names = (['start_dx_cm', 'start_dy_cm', 'start_dtheta_deg']
+             + ['end_x_cm', 'end_y_cm', 'end_theta_deg']
+             + [f'dev_{i}_cm' for i in range(1, len(raw['devs_cm']) + 1)])
+    vals = list(raw['start_pose_cm']) + list(raw['end_pose_cm']) + list(raw['devs_cm'])
+    with open(p, 'w', newline='') as f:
+        w = csv.writer(f)
+        w.writerow(['key', 'value'])
+        for k, v in zip(names, vals):
+            w.writerow([k, v])
+    return p
+
+
 def auto_batch(batch, backend, truth, sender, cfg, outdir, csv_path,
                ghash, v_r, stop_event, homing_fn=None, input_fn=input,
                done=(), only=None):
@@ -254,20 +318,21 @@ def write_summary(outdir):
         f"生成: {datetime.datetime.now().isoformat(timespec='seconds')} / "
         f"git {rows[0]['git_hash']} / 全{len(rows)}走行",
         '',
-        '| 条件 | 到達 | RMSE_cm | Σ\\|u\\| | 反転 | ω0率 | 解p95ms |',
-        '|------|------|---------|--------|------|------|---------|',
+        '| 条件 | 到達 | RMSE_cm | Σ\\|u\\| | 反転 | ω0率 | 解p95ms | 真値終点cm |',
+        '|------|------|---------|--------|------|------|---------|-----------|',
     ]
     for c in conds:
         rs = [r for r in rows if r['cond'] == c]
         oks = [r for r in rs if str(r['ok']).lower() == 'true']
 
         def col(key, rs=oks):
-            return _mean_std([float(r[key]) for r in rs if r[key] != ''])
+            return _mean_std([float(r[key]) for r in rs
+                              if r.get(key, '') != ''])
 
         lines.append(
             f"| {c} | {len(oks)}/{len(rs)} | {col('rmse_cm')} | "
             f"{col('sum_u')} | {col('flips')} | {col('w_zero_ratio')} | "
-            f"{col('solve_p95')} |")
+            f"{col('solve_p95')} | {col('truth_end_dist_cm')} |")
     lines += ['', '注: RMSEはodom基準（真値は外部計測）。ok=false の行は'
               '到達数のみ反映し平均から除外。']
     (outdir / 'summary.md').write_text('\n'.join(lines) + '\n')
@@ -321,6 +386,9 @@ def main():
     ap.add_argument('--home-only', action='store_true',
                     help='実機のみ: 走行せず原点復帰を1回だけ実行して終了')
     ap.add_argument('--camera-config', default='configs/camera_truth.yaml')
+    ap.add_argument('--manual', action='store_true',
+                    help='走行後に方眼の読み値を手入力して truth_* 列を埋める'
+                         '（カメラを置けない環境用。--auto とは併用不可）')
     args = ap.parse_args()
 
     from exp_backends import SimBackend, load_path
@@ -338,6 +406,8 @@ def main():
 
     if (args.auto or args.home_only) and backend_kind != 'real':
         raise SystemExit('--auto / --home-only は --backend real 専用です')
+    if args.manual and args.auto:
+        raise SystemExit('--manual と --auto は併用できません')
     if backend_kind == 'sim':
         backend = SimBackend(batch)
     else:
@@ -405,6 +475,12 @@ def main():
             print(f'完了: {outdir}/runs.csv, summary.md')
         return
 
+    manual_wps = None
+    if args.manual:
+        from exp_backends import load_path as _load_path
+        manual_wps, _ = _load_path(batch['path_file'])
+        Path(outdir).mkdir(parents=True, exist_ok=True)
+
     for cond in batch['conditions']:
         if args.only and cond['name'] != args.only:
             continue
@@ -421,12 +497,23 @@ def main():
                 result = dict(ok=False, metrics={}, bagdir='',
                               note=f'error: {e}')
             row = make_row(batch, cond, rep, backend_kind, result, ghash, v_r)
+            tm = {}
+            if args.manual:
+                print(f"\n[手計測] {cond['name']} rep{rep}（q で中断）")
+                try:
+                    tm, raw = read_manual_metrics(input, manual_wps)
+                except KeyboardInterrupt:
+                    print('\nバッチ中断')
+                    return
+                write_manual_readings(outdir, cond['name'], rep, raw)
+                row.update({k: f'{v:.4f}' for k, v in tm.items()})
             append_row(csv_path, row)
             m = result.get('metrics', {})
             print(f"{cond['name']} rep{rep}: ok={result['ok']} "
                   f"rmse={m.get('rmse_cm', float('nan')):.2f}cm "
                   f"Σ|u|={m.get('sum_u', float('nan')):.2f} "
-                  f"反転={m.get('flips', '-')}")
+                  f"反転={m.get('flips', '-')} "
+                  f"真値終点={tm.get('truth_end_dist_cm', float('nan')):.1f}cm")
     if csv_path.exists():
         write_summary(outdir)
         print(f'完了: {outdir}/runs.csv, summary.md')
