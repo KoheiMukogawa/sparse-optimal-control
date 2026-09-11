@@ -123,3 +123,45 @@ def truth_metrics(rows, waypoints, window_s=0.5):
                 truth_end_dist_cm=math.hypot(ex - gx, ey - gy) * 100.0,
                 truth_end_dist_abs_cm=math.hypot(ex - agx, ey - agy) * 100.0,
                 truth_rmse_cm=rmse * 100.0)
+
+
+def manual_metrics(devs_cm, end_pose_cm, start_pose_cm, waypoints):
+    """方眼直読の手入力値 → 真値指標（カメラ版 truth_metrics と同じキー）。
+
+    大学の実験環境ではカメラ俯瞰を設置できないため、走行面を方眼紙にして
+    ペン軌跡を直読する（設計: specs/2026-09-12-大学実験環境への移行-design.md）。
+    コースが方眼の格子線と一致するので、横偏差は格子からのずれをそのまま読める。
+
+    devs_cm      : [横偏差 cm] 10cm刻みステーションの符号付き横偏差（左が正）
+    end_pose_cm  : (x_cm, y_cm, theta_deg) 終点の駆動軸中心（紙面座標）
+    start_pose_cm: (dx_cm, dy_cm, dtheta_deg) 開始姿勢の基準線からのズレ
+    waypoints    : [(x_m, y_m)] コース（path yaml の waypoints）
+
+    truth_end_dist_cm は **実測した開始poseに固定したコース** 基準、
+    truth_end_dist_abs_cm は紙面に描いたコース基準。truth_metrics と同じ契約。
+    """
+    if not devs_cm:
+        raise ValueError("横偏差の手入力が空（読み値なし）")
+    ex = end_pose_cm[0] / 100.0
+    ey = end_pose_cm[1] / 100.0
+    eth = math.radians(end_pose_cm[2])
+    sx = start_pose_cm[0] / 100.0
+    sy = start_pose_cm[1] / 100.0
+    sth = math.radians(start_pose_cm[2])
+
+    c, s = math.cos(sth), math.sin(sth)
+    course = [(sx + c * px - s * py, sy + s * px + c * py)
+              for px, py in waypoints]
+    gx, gy = course[-1]
+    agx, agy = waypoints[-1]
+
+    rmse_cm = math.sqrt(sum(d * d for d in devs_cm) / len(devs_cm))
+    return dict(
+        truth_end_x=ex, truth_end_y=ey, truth_end_theta=eth,
+        truth_end_dist_cm=math.hypot(ex - gx, ey - gy) * 100.0,
+        truth_end_dist_abs_cm=math.hypot(ex - agx, ey - agy) * 100.0,
+        truth_rmse_cm=rmse_cm,
+        start_dx_cm=float(start_pose_cm[0]),
+        start_dy_cm=float(start_pose_cm[1]),
+        start_dtheta_deg=float(start_pose_cm[2]),
+    )
