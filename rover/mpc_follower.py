@@ -9,6 +9,7 @@ mpc_core.MPCFollower に差し替えたもの。3者比較（Kanayama/L2/L1）�
   配信: rover_twist (geometry_msgs/Twist) ← pos_controller が購読
   配信: path_error (geometry_msgs/Vector3) 誤差ログ (x_e, y_e, θ_e)
   配信: mpc_solve_ms (std_msgs/Float32)   求解時間ログ（計算負荷の指標）
+  配信: mpc_solve_iters (std_msgs/Int32)  OSQP反復回数（機種非依存の計算負荷指標）
 
 実行（RPi上、ベースノード起動後）:
   ros2 launch lightrover_ros nav_base.launch.py   # 別端末で
@@ -25,7 +26,7 @@ import yaml
 from geometry_msgs.msg import Twist, Vector3
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Int32
 
 from follower_core import (goal_crossed, goal_scaled_vr, reference_pose,
                            tracking_error, yaw_from_quat_xyzw)
@@ -85,6 +86,7 @@ class MpcFollowerNode(Node):
         self.cmd_pub = self.create_publisher(Twist, 'rover_twist', 1)
         self.err_pub = self.create_publisher(Vector3, 'path_error', 1)
         self.solve_pub = self.create_publisher(Float32, 'mpc_solve_ms', 1)
+        self.iters_pub = self.create_publisher(Int32, 'mpc_solve_iters', 1)
         self.create_subscription(Odometry, 'odom', self.cb_odom, 1)
         self.create_timer(ts, self.control_step)
         self.get_logger().info(
@@ -137,6 +139,7 @@ class MpcFollowerNode(Node):
         v_r = goal_scaled_vr(self.get_parameter('v_r').value, goal_dist)
         cmd_uv = self.mpc.command(x_e, y_e, th_e, v_r, w_r=0.0)
         self.solve_pub.publish(Float32(data=float(self.mpc.last_solve_s * 1e3)))
+        self.iters_pub.publish(Int32(data=int(self.mpc.last_iters)))
 
         if cmd_uv is None:
             # 求解失敗時は安全に停止（実行不可能・ソルバーエラー）

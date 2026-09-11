@@ -33,10 +33,11 @@ TYPESTORE = get_typestore(Stores.ROS2_HUMBLE)
 
 
 def read_bag(bagdir):
-    """bag → 時系列 (twist, perr, solve_ms)。compute_metrics に渡す形式。"""
+    """bag → 時系列 (twist, perr, solve_ms, iters)。compute_metrics に渡す形式。"""
     twist = []   # (t_s, v, w)
     perr = []    # (t_s, y_e)
     solve = []   # ms
+    iters = []   # OSQP 反復回数
     with AnyReader([Path(bagdir)], default_typestore=TYPESTORE) as reader:
         for conn, ts, raw in reader.messages():
             t = ts * 1e-9
@@ -49,14 +50,18 @@ def read_bag(bagdir):
             elif conn.topic == '/mpc_solve_ms':
                 m = reader.deserialize(raw, conn.msgtype)
                 solve.append(float(m.data))
-    return twist, perr, solve
+            elif conn.topic == '/mpc_solve_iters':
+                m = reader.deserialize(raw, conn.msgtype)
+                iters.append(int(m.data))
+    return twist, perr, solve, iters
 
 
 def analyze(bagdir):
-    twist, perr, solve = read_bag(bagdir)
+    twist, perr, solve, iters = read_bag(bagdir)
     if not twist:
         raise SystemExit(f"{bagdir}: /rover_twist が空")
-    return dict(name=Path(bagdir).name, **compute_metrics(twist, perr, solve))
+    return dict(name=Path(bagdir).name,
+                **compute_metrics(twist, perr, solve, iters))
 
 
 def main():

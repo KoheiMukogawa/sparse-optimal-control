@@ -19,12 +19,14 @@ def _pct(sorted_vals, p):
     return sorted_vals[min(len(sorted_vals) - 1, int(p * len(sorted_vals)))]
 
 
-def compute_metrics(twist, perr=(), solve_ms=()):
+def compute_metrics(twist, perr=(), solve_ms=(), iters=()):
     """時系列から指標dictを返す。
 
     twist   : [(t_s, v, w)] 適用された速度指令
     perr    : [(t_s, y_e)]  横偏差（odom基準）
     solve_ms: [ms]          求解時間（Kanayamaは空でよい）
+    iters   : [int]         OSQP 反復回数（Kanayamaは空でよい）。
+                            ms と違い機種に依存しないので実機とlaptopを比較できる
     """
     if not twist:
         raise ValueError("twist が空（走行データなし）")
@@ -55,6 +57,7 @@ def compute_metrics(twist, perr=(), solve_ms=()):
                if ye else float('nan'))
 
     sv = sorted(solve_ms)
+    si = sorted(int(i) for i in iters)
     return dict(
         drive_s=t1 - t0,
         steps=len(active),
@@ -67,6 +70,9 @@ def compute_metrics(twist, perr=(), solve_ms=()):
         solve_p50=_pct(sv, 0.50),
         solve_p95=_pct(sv, 0.95),
         solve_max=sv[-1] if sv else float('nan'),
+        iters_p50=_pct(si, 0.50),
+        iters_p95=_pct(si, 0.95),
+        iters_max=si[-1] if si else float('nan'),
     )
 
 

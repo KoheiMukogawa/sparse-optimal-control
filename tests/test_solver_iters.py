@@ -109,3 +109,24 @@ def test_run_case_returns_row_and_series():
     assert row["iters_total"] > 0
     assert row["flips"] >= 8, "遅延2step の素のL1 はチャタるはず"
     assert any(r["near_flip"] for r in series)
+
+
+def test_sim_batch_records_iterations_in_metrics():
+    """sim_run が集めた反復回数が指標まで通っていること（runs.csv に出る前提）。"""
+    from exp_backends import SimBackend
+    batch = dict(name="t", path_file="configs/path_L_turn_1m.yaml",
+                 common=COMMON, sim={}, timeout_s=30, repeats=1,
+                 conditions=[dict(name="l1", controller="l1", lam=0.3)])
+    res = SimBackend(batch).run_one(batch["conditions"][0], 1, None)
+    assert res["metrics"]["iters_p50"] > 0
+
+
+def test_kanayama_sim_batch_has_no_iterations():
+    import math
+
+    from exp_backends import SimBackend
+    batch = dict(name="t", path_file="configs/path_L_turn_1m.yaml",
+                 common=COMMON, sim={}, timeout_s=30, repeats=1,
+                 conditions=[dict(name="kan", controller="kanayama")])
+    res = SimBackend(batch).run_one(batch["conditions"][0], 1, None)
+    assert math.isnan(res["metrics"]["iters_p50"])

@@ -139,7 +139,8 @@ class SimBackend:
         if not data['twist']:
             return dict(ok=data['ok'], metrics={}, bagdir='',
                         note='走行データなし（即到達または初手求解失敗）')
-        metrics = compute_metrics(data['twist'], data['perr'], data['solve_ms'])
+        metrics = compute_metrics(data['twist'], data['perr'],
+                                  data['solve_ms'], data['iters'])
         note = '' if data['ok'] else 'タイムアウト/求解失敗'
         return dict(ok=data['ok'], metrics=metrics, bagdir='', note=note)
 
@@ -154,7 +155,8 @@ SSH_USER = 'mukougawakouhei'
 SSH_HOSTS = ['192.168.0.32', '192.168.0.31', '192.168.4.1']
 RPI_ROOT = '/home/mukougawakouhei/sparse_control'
 RPI_BRIDGE = f'{RPI_ROOT}/rover/udp_twist_bridge.py'
-BAG_TOPICS = '/odom /rover_twist /path_error /mpc_solve_ms'
+BAG_TOPICS = ('/odom /rover_twist /path_error /mpc_solve_ms '
+              '/mpc_solve_iters')
 SYNC_FILES = ['rover/mpc_follower.py', 'rover/path_follower.py',
               'rover/follower_core.py', 'rover/mpc_core.py']
 STARTUP_MARGIN_S = {'kanayama': 15, 'l2': 90, 'l1': 90}  # cvxpy import 30-60s
@@ -344,7 +346,7 @@ class RealBackend:
         self._ssh(f'rm -rf {remote_bag}')
 
         from analyze_bag import read_bag
-        twist, perr, solve = read_bag(str(bagdir))
-        metrics = compute_metrics(twist, perr, solve)
+        twist, perr, solve, iters = read_bag(str(bagdir))
+        metrics = compute_metrics(twist, perr, solve, iters)
         return dict(ok=reached, metrics=metrics, bagdir=str(bagdir),
                     note='' if reached else 'タイムアウト/ノード異常終了')

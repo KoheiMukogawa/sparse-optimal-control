@@ -31,6 +31,7 @@ CSV_COLUMNS = [
     'controller', 'lam', 'move_suppress', 'horizon', 'v_r', 'ok',
     'drive_s', 'rmse_cm', 'sum_u', 'w_zero_ratio', 'flips', 'sat_ratio',
     'max_w', 'solve_p50', 'solve_p95', 'solve_max',
+    'iters_p50', 'iters_p95', 'iters_max',
     'truth_end_x', 'truth_end_y', 'truth_end_theta',
     'truth_end_dist_cm', 'truth_end_dist_abs_cm', 'truth_rmse_cm',
     'start_dx_cm', 'start_dy_cm', 'start_dtheta_deg',
@@ -101,7 +102,8 @@ def make_row(batch, cond, rep, backend_name, result, git_hash, v_r):
         bagdir=result.get('bagdir', ''), note=result.get('note', ''),
     )
     for k in ('drive_s', 'rmse_cm', 'sum_u', 'w_zero_ratio', 'flips',
-              'sat_ratio', 'max_w', 'solve_p50', 'solve_p95', 'solve_max'):
+              'sat_ratio', 'max_w', 'solve_p50', 'solve_p95', 'solve_max',
+              'iters_p50', 'iters_p95', 'iters_max'):
         if k in m:
             row[k] = m[k]
     return row
