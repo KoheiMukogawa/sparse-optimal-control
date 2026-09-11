@@ -10,8 +10,8 @@ import csv
 
 import pytest
 
-from run_batch import (CSV_COLUMNS, read_manual_metrics,
-                       write_manual_readings)
+from run_batch import (CSV_COLUMNS, needs_manual_reading,
+                       read_manual_metrics, write_manual_readings)
 
 WPS = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)]
 
@@ -76,3 +76,12 @@ def test_readings_are_saved_for_reanalysis(tmp_path):
 def test_start_offset_columns_exist():
     for c in ("start_dx_cm", "start_dy_cm", "start_dtheta_deg"):
         assert c in CSV_COLUMNS
+
+
+def test_manual_reading_skipped_when_run_failed():
+    """走行失敗（ok=False）では手計測を求めない（再実行で読み値は破棄されるため）。"""
+    assert needs_manual_reading({"ok": False, "metrics": {}}) is False
+
+
+def test_manual_reading_requested_when_run_succeeded():
+    assert needs_manual_reading({"ok": True, "metrics": {}}) is True

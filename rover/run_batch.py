@@ -223,6 +223,17 @@ def write_manual_readings(outdir, cond_name, rep, raw):
     return p
 
 
+def needs_manual_reading(result):
+    """--manual時に方眼読み取りを求めるべきか（走行成功時のみ）。
+
+    失敗した走行（timeout/ノード異常終了など）は done_keys が再実行対象と
+    みなし読み値も破棄されるため、失敗のたびにオペレータへ数値のでっち上げか
+    q（全体中断）を迫らない。走行45〜60本規模のバッチで数本は失敗しうる
+    （実測: あるsmokeバッチは2/3成功）ため、失敗時は素通りさせる。
+    """
+    return bool(result.get('ok'))
+
+
 def auto_batch(batch, backend, truth, sender, cfg, outdir, csv_path,
                ghash, v_r, stop_event, homing_fn=None, input_fn=input,
                done=(), only=None):
@@ -499,21 +510,26 @@ def main():
             row = make_row(batch, cond, rep, backend_kind, result, ghash, v_r)
             tm = {}
             if args.manual:
-                print(f"\n[手計測] {cond['name']} rep{rep}（q で中断）")
-                try:
-                    tm, raw = read_manual_metrics(input, manual_wps)
-                except KeyboardInterrupt:
-                    print('\nバッチ中断')
-                    return
-                write_manual_readings(outdir, cond['name'], rep, raw)
-                row.update({k: f'{v:.4f}' for k, v in tm.items()})
+                if needs_manual_reading(result):
+                    print(f"\n[手計測] {cond['name']} rep{rep}（q で中断）")
+                    try:
+                        tm, raw = read_manual_metrics(input, manual_wps)
+                    except KeyboardInterrupt:
+                        print('\nバッチ中断')
+                        return
+                    write_manual_readings(outdir, cond['name'], rep, raw)
+                    row.update({k: f'{v:.4f}' for k, v in tm.items()})
+                else:
+                    print(f"[手計測] {cond['name']} rep{rep}: "
+                          '走行失敗のため手計測はスキップします')
             append_row(csv_path, row)
             m = result.get('metrics', {})
+            truth_part = (f" 真値終点={tm['truth_end_dist_cm']:.1f}cm"
+                          if tm else '')
             print(f"{cond['name']} rep{rep}: ok={result['ok']} "
                   f"rmse={m.get('rmse_cm', float('nan')):.2f}cm "
                   f"Σ|u|={m.get('sum_u', float('nan')):.2f} "
-                  f"反転={m.get('flips', '-')} "
-                  f"真値終点={tm.get('truth_end_dist_cm', float('nan')):.1f}cm")
+                  f"反転={m.get('flips', '-')}{truth_part}")
     if csv_path.exists():
         write_summary(outdir)
         print(f'完了: {outdir}/runs.csv, summary.md')
