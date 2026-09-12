@@ -28,8 +28,9 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from std_msgs.msg import Float32, Int32
 
-from follower_core import (goal_crossed, goal_scaled_vr, reference_pose,
-                           tracking_error, yaw_from_quat_xyzw)
+from follower_core import (CommandDelay, goal_crossed, goal_scaled_vr,
+                           reference_pose, tracking_error,
+                           yaw_from_quat_xyzw)
 from mpc_core import MPCFollower
 
 # ゲームパッド操作時のレンジに合わせた安全上限（pos_controller と整合）
@@ -48,6 +49,9 @@ class MpcFollowerNode(Node):
         # 移動抑制（Δu率ペナルティ）。実機遅延下で L1 の bang-bang チャタを抑える。
         # 既定0で従来挙動。L字チャタ対策は sim で ms≈2.0 が有効（Lturn_compare.md D節）。
         self.declare_parameter('move_suppress', 0.0)
+        # R16: 人工遅延注入。指令を N ステップ遅らせて w_ms の遅延マージンを
+        # 実機で検証する。既定0＝従来挙動。sim の delay_steps と同一意味。
+        self.declare_parameter('cmd_delay_steps', 0)
         self.declare_parameter('v_r', 0.1)         # 基準速度 [m/s]
         self.declare_parameter('lookahead', 0.15)  # 参照点を前方に置く距離 [m]
         self.declare_parameter('goal_tol', 0.05)   # 終点到達判定 [m]
@@ -87,6 +91,8 @@ class MpcFollowerNode(Node):
         self.err_pub = self.create_publisher(Vector3, 'path_error', 1)
         self.solve_pub = self.create_publisher(Float32, 'mpc_solve_ms', 1)
         self.iters_pub = self.create_publisher(Int32, 'mpc_solve_iters', 1)
+        self.cmd_delay = CommandDelay(
+            self.get_parameter('cmd_delay_steps').value)
         self.create_subscription(Odometry, 'odom', self.cb_odom, 1)
         self.create_timer(ts, self.control_step)
         self.get_logger().info(
@@ -117,6 +123,7 @@ class MpcFollowerNode(Node):
             return
         elapsed = (self.get_clock().now() - self.last_odom_time).nanoseconds * 1e-9
         if elapsed > ODOM_TIMEOUT:
+            self.cmd_delay.reset()
             self.cmd_pub.publish(Twist())
             self.get_logger().warn('odom途絶のため停止', throttle_duration_sec=2.0)
             return
@@ -126,6 +133,7 @@ class MpcFollowerNode(Node):
         goal_dist = math.hypot(gx - x, gy - y)
         if (goal_dist < self.get_parameter('goal_tol').value
                 or goal_crossed(self.local_waypoints, x, y)):
+            self.cmd_delay.reset()
             self.cmd_pub.publish(Twist())
             self.goal_reached = True
             self.get_logger().info('目標到達。停止します')
@@ -143,6 +151,7 @@ class MpcFollowerNode(Node):
 
         if cmd_uv is None:
             # 求解失敗時は安全に停止（実行不可能・ソルバーエラー）
+            self.cmd_delay.reset()
             self.cmd_pub.publish(Twist())
             self.solve_warn_count += 1
             self.get_logger().warn(
@@ -151,6 +160,7 @@ class MpcFollowerNode(Node):
             return
 
         v, w = cmd_uv
+        v, w = self.cmd_delay.push((v, w), (v_r, 0.0))
         cmd = Twist()
         cmd.linear.x = v
         cmd.angular.z = w

@@ -5,6 +5,7 @@ path_follower.py（ROS2ノード）とシミュレーション検証の両方か
 """
 
 import math
+from collections import deque
 
 
 def normalize_angle(a):
@@ -90,3 +91,30 @@ def goal_scaled_vr(v_r, goal_dist, slow_radius=0.3):
     if goal_dist >= slow_radius:
         return v_r
     return v_r * goal_dist / slow_radius
+
+
+class CommandDelay:
+    """指令を steps ステップ遅らせて出す（R16 実機への人工遅延注入）。
+
+    exp_backends.sim_run の入力遅延と同一セマンティクス:
+    バッファが埋まるまでは fill（基準速度で直進）を返し、
+    以降は steps 前の指令を返す。steps=0 は素通し。
+
+    停止指令は遅らせてはならない（到達・odom途絶・求解失敗）。
+    呼び出し側は push を通さず reset() してから直接 publish すること。
+    """
+
+    def __init__(self, steps):
+        self.steps = max(0, int(steps))
+        self._buf = deque()
+
+    def push(self, cmd, fill):
+        """cmd を投入し、いま出すべき指令を返す。fill は充填中に出す指令。"""
+        self._buf.append(cmd)
+        if len(self._buf) > self.steps:
+            return self._buf.popleft()
+        return fill
+
+    def reset(self):
+        """保留中の指令を捨てる（停止時に古い指令が後から出ないように）。"""
+        self._buf.clear()

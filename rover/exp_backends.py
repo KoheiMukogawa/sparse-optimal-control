@@ -60,7 +60,10 @@ def sim_run(cond, common, waypoints, v_r, sim_opts, timeout_s, seed):
     対比が実機の odom vs カメラ真値（6.6節）と同型になる。
     """
     ts = 1.0 / float(common.get('rate', 10.0))
-    delay = int(sim_opts.get('delay_steps', 2))
+    # 素の遅延（実機相当）＋ R16 の人工遅延注入。実機側は mpc_follower の
+    # CommandDelay が同じ意味で効くので、同じ yaml を sim/real で比較できる
+    delay = (int(sim_opts.get('delay_steps', 2))
+             + int(cond.get('cmd_delay_steps', 0)))
     pn = float(sim_opts.get('pos_noise', 0.0))
     yn = float(sim_opts.get('yaw_noise', 0.0))
     init_lat = float(sim_opts.get('init_lat', 0.0))
@@ -176,7 +179,8 @@ def node_command(cond, common, path_file):
                    f"-p lam:={cond.get('lam', 0.3)}",
                    f"-p move_suppress:={cond.get('move_suppress', 0.0)}",
                    f"-p horizon:={common.get('horizon', 15)}",
-                   f"-p rate:={common.get('rate', 10.0)}"]
+                   f"-p rate:={common.get('rate', 10.0)}",
+                   f"-p cmd_delay_steps:={cond.get('cmd_delay_steps', 0)}"]
     return (f'{ROS_SETUP} && cd {RPI_ROOT}/rover && python3 {script} '
             '--ros-args ' + ' '.join(params))
 

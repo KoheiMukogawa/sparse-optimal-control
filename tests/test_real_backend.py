@@ -63,3 +63,21 @@ def test_watch_node_timeout_returns_false():
     finally:
         proc.kill()
         proc.wait(timeout=5)
+
+
+def test_node_command_passes_cmd_delay_steps():
+    """R16 のバッチ条件から実機ノードへ人工遅延が届くこと。"""
+    from exp_backends import node_command
+    cmd = node_command(dict(name="d2", controller="l1", lam=0.3,
+                            move_suppress=2.0, cmd_delay_steps=2),
+                       dict(horizon=15, rate=10.0),
+                       "configs/path_L_turn_1m.yaml")
+    assert "-p cmd_delay_steps:=2" in cmd
+
+
+def test_node_command_defaults_cmd_delay_to_zero():
+    from exp_backends import node_command
+    cmd = node_command(dict(name="l1", controller="l1", lam=0.3),
+                       dict(horizon=15, rate=10.0),
+                       "configs/path_L_turn_1m.yaml")
+    assert "-p cmd_delay_steps:=0" in cmd
