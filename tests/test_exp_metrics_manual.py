@@ -61,9 +61,10 @@ def test_start_offset_is_recorded_as_is():
     assert m["start_dtheta_deg"] == pytest.approx(0.8)
 
 
-def test_empty_readings_is_an_error():
-    with pytest.raises(ValueError):
-        manual_metrics([], (100.0, 100.0, 90.0), (0, 0, 0), WPS)
+def test_empty_readings_keep_endpoint_but_mark_rmse_missing():
+    m = manual_metrics([], (100.0, 100.0, 90.0), (0, 0, 0), WPS)
+    assert math.isnan(m["truth_rmse_cm"])
+    assert m["truth_end_dist_cm"] == pytest.approx(0.0)
 
 
 def test_keys_match_the_camera_version():

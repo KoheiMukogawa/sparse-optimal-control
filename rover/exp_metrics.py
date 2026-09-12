@@ -101,6 +101,10 @@ def truth_metrics(rows, waypoints, window_s=0.5):
     描くため、homing の向き残差（±2°でも1.4m先で±5cm）が追従誤差に
     混入しないようにする。タグ座標系ゴールへの絶対距離は
     truth_end_dist_abs_cm に別掲（設営・homing品質の指標）。
+
+    truth_rmse_cm は、実測した開始poseに固定したコースに対してカメラの
+    有効フレームを時間サンプリングしたRMSE。manual_metrics の紙面基準・
+    空間サンプリング（10cm刻み）RMSEとは測定基準と重み付けが異なる。
     """
     valid = [r for r in rows if r[1] is not None]
     if not valid:
@@ -138,16 +142,17 @@ def manual_metrics(devs_cm, end_pose_cm, start_pose_cm, waypoints):
     ペン軌跡を直読する（設計: specs/2026-09-12-大学実験環境への移行-design.md）。
     コースが方眼の格子線と一致するので、横偏差は格子からのずれをそのまま読める。
 
-    devs_cm      : [横偏差 cm] 10cm刻みステーションの符号付き横偏差（左が正）
+    devs_cm      : [横偏差 cm] 10cm刻みステーションの符号付き横偏差（左が正）。
+                   空なら終点のみを記録し truth_rmse_cm は NaN（欠測）
     end_pose_cm  : (x_cm, y_cm, theta_deg) 終点の駆動軸中心（紙面座標）
     start_pose_cm: (dx_cm, dy_cm, dtheta_deg) 開始姿勢の基準線からのズレ
     waypoints    : [(x_m, y_m)] コース（path yaml の waypoints）
 
     truth_end_dist_cm は **実測した開始poseに固定したコース** 基準、
     truth_end_dist_abs_cm は紙面に描いたコース基準。truth_metrics と同じ契約。
+    一方 truth_rmse_cm は紙面に描いたコースを基準に10cm刻みで読む空間
+    サンプリング値で、カメラ版の開始pose基準・時間サンプリング値とは異なる。
     """
-    if not devs_cm:
-        raise ValueError("横偏差の手入力が空（読み値なし）")
     ex = end_pose_cm[0] / 100.0
     ey = end_pose_cm[1] / 100.0
     eth = math.radians(end_pose_cm[2])
@@ -161,7 +166,8 @@ def manual_metrics(devs_cm, end_pose_cm, start_pose_cm, waypoints):
     gx, gy = course[-1]
     agx, agy = waypoints[-1]
 
-    rmse_cm = math.sqrt(sum(d * d for d in devs_cm) / len(devs_cm))
+    rmse_cm = (math.sqrt(sum(d * d for d in devs_cm) / len(devs_cm))
+               if devs_cm else float('nan'))
     return dict(
         truth_end_x=ex, truth_end_y=ey, truth_end_theta=eth,
         truth_end_dist_cm=math.hypot(ex - gx, ey - gy) * 100.0,

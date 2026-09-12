@@ -7,11 +7,13 @@
 """
 
 import csv
+import math
 
 import pytest
 
 from run_batch import (CSV_COLUMNS, needs_manual_reading,
-                       read_manual_metrics, write_manual_readings)
+                       format_truth_metrics, read_manual_metrics,
+                       write_manual_readings)
 
 WPS = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)]
 
@@ -43,6 +45,23 @@ def test_commas_are_accepted_as_separators():
     assert raw["devs_cm"] == [1.5, -2.0]
 
 
+def test_blank_deviations_mean_endpoint_only():
+    metrics, raw = read_manual_metrics(
+        feeder(["0 0 0", "93 97 4", ""]), WPS)
+    assert raw["devs_cm"] == []
+    assert math.isnan(metrics["truth_rmse_cm"])
+    assert metrics["truth_end_x"] == pytest.approx(0.93)
+
+
+def test_missing_manual_rmse_is_blank_in_runs_csv():
+    formatted = format_truth_metrics({
+        "truth_end_dist_cm": 5.25,
+        "truth_rmse_cm": float("nan"),
+    })
+    assert formatted["truth_end_dist_cm"] == "5.2500"
+    assert formatted["truth_rmse_cm"] == ""
+
+
 def test_q_aborts():
     with pytest.raises(KeyboardInterrupt):
         read_manual_metrics(feeder(["q"]), WPS)
@@ -71,6 +90,18 @@ def test_readings_are_saved_for_reanalysis(tmp_path):
     assert vals["dev_2_cm"] == -2.0
     assert vals["end_x_cm"] == 93.0
     assert vals["start_dtheta_deg"] == 1.0
+
+
+def test_endpoint_only_readings_are_saved_without_fake_deviations(tmp_path):
+    raw = {"devs_cm": [], "end_pose_cm": [93.0, 97.0, 4.0],
+           "start_pose_cm": [0.5, 0.0, 1.0]}
+    p = write_manual_readings(str(tmp_path), "l2", 2, raw)
+    rows = list(csv.DictReader(p.open()))
+    assert not any(r["key"].startswith("dev_") for r in rows)
+    assert {r["key"] for r in rows} == {
+        "start_dx_cm", "start_dy_cm", "start_dtheta_deg",
+        "end_x_cm", "end_y_cm", "end_theta_deg",
+    }
 
 
 def test_start_offset_columns_exist():

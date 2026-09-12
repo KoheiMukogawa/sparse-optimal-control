@@ -28,7 +28,8 @@ import yaml
 
 CSV_COLUMNS = [
     'batch', 'cond', 'rep', 'backend', 'timestamp', 'git_hash',
-    'controller', 'lam', 'move_suppress', 'horizon', 'v_r', 'ok',
+    'controller', 'lam', 'move_suppress', 'cmd_delay_steps',
+    'horizon', 'v_r', 'ok',
     'drive_s', 'rmse_cm', 'sum_u', 'w_zero_ratio', 'flips', 'sat_ratio',
     'max_w', 'solve_p50', 'solve_p95', 'solve_max',
     'iters_p50', 'iters_p95', 'iters_max',
@@ -59,6 +60,14 @@ def load_batch(yaml_path):
             raise ValueError(f"不正な controller: {c.get('controller')}")
         if 'name' not in c or c['name'] in names:
             raise ValueError(f'条件 name が無いか重複: {c}')
+        delay = c.get('cmd_delay_steps', 0)
+        if isinstance(delay, bool) or not isinstance(delay, int) or delay < 0:
+            raise ValueError(
+                f"cmd_delay_steps は0以上の整数が必要です: {delay!r}")
+        if c['controller'] == 'kanayama' and delay != 0:
+            raise ValueError(
+                'Kanayama実機はcmd_delay_stepsに対応していません: '
+                f"{c['name']}")
         names.add(c['name'])
     return b
 
@@ -97,6 +106,7 @@ def make_row(batch, cond, rep, backend_name, result, git_hash, v_r):
         controller=cond['controller'],
         lam=cond.get('lam', ''),
         move_suppress=cond.get('move_suppress', ''),
+        cmd_delay_steps=cond.get('cmd_delay_steps', 0),
         horizon=batch.get('common', {}).get('horizon', ''),
         v_r=v_r, ok=result['ok'],
         bagdir=result.get('bagdir', ''), note=result.get('note', ''),
@@ -173,7 +183,7 @@ def _ask_floats(input_fn, prompt, n, allow_blank=False):
         if s.strip().lower() == 'q':
             raise KeyboardInterrupt
         if allow_blank and not s.strip():
-            return [0.0] * n
+            return [] if n is None else [0.0] * n
         try:
             vals = [float(t) for t in s.replace(',', ' ').split()]
         except ValueError:
@@ -200,9 +210,24 @@ def read_manual_metrics(input_fn, waypoints):
     end = _ask_floats(
         input_fn, '  終点 x[cm] y[cm] θ[deg]: ', 3)
     devs = _ask_floats(
-        input_fn, '  横偏差[cm] を10cm刻みでスペース区切り（左が正）: ', None)
+        input_fn,
+        '  横偏差[cm] を10cm刻みでスペース区切り（左が正、空Enterで終点のみ）: ',
+        None, allow_blank=True)
     raw = dict(devs_cm=devs, end_pose_cm=end, start_pose_cm=start)
     return manual_metrics(devs, end, start, waypoints), raw
+
+
+def format_truth_metrics(metrics):
+    """真値指標を runs.csv 用に整形する（欠測値は空欄）。"""
+    out = {}
+    for key, value in metrics.items():
+        try:
+            numeric = float(value)
+            finite = math.isfinite(numeric)
+        except (TypeError, ValueError):
+            finite = False
+        out[key] = f'{numeric:.4f}' if finite else ''
+    return out
 
 
 def write_manual_readings(outdir, cond_name, rep, raw):
@@ -274,7 +299,7 @@ def auto_batch(batch, backend, truth, sender, cfg, outdir, csv_path,
         rows = truth.stop()
         tm = truth_metrics(rows, waypoints)
         row = make_row(batch, cond, rep, backend.name, result, ghash, v_r)
-        row.update({k: f'{v:.4f}' for k, v in tm.items()})
+        row.update(format_truth_metrics(tm))
         append_row(csv_path, row)
         print(f"{cond['name']} rep{rep}: ok={result['ok']} "
               f"truth_end={tm.get('truth_end_dist_cm', float('nan')):.1f}cm")
@@ -520,7 +545,7 @@ def main():
                         print('\nバッチ中断')
                         return
                     write_manual_readings(outdir, cond['name'], rep, raw)
-                    row.update({k: f'{v:.4f}' for k, v in tm.items()})
+                    row.update(format_truth_metrics(tm))
                 else:
                     print(f"[手計測] {cond['name']} rep{rep}: "
                           '走行失敗のため手計測はスキップします')

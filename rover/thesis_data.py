@@ -21,7 +21,8 @@ CONDITIONS = ["kanayama", "l2", "l1", "l1_ms2"]
 
 # 集計対象の数値列。solve_* は kanayama で nan（解析的フィードバックのため）
 NUMERIC_FIELDS = ["drive_s", "rmse_cm", "sum_u", "w_zero_ratio", "flips",
-                  "sat_ratio", "max_w", "solve_p50", "solve_p95", "solve_max"]
+                  "sat_ratio", "max_w", "solve_p50", "solve_p95", "solve_max",
+                  "iters_p50", "iters_p95", "iters_max"]
 
 # レーダーチャートの軸（名前, 参照先, 大きいほど良いか）
 RADAR_AXES = [

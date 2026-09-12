@@ -5,7 +5,8 @@ import subprocess
 import sys
 import time
 
-from exp_backends import ROS_SETUP, bag_record_command, node_command, watch_node
+from exp_backends import (ROS_SETUP, SSH_HOSTS, bag_record_command, node_command,
+                          ssh_hosts, watch_node)
 
 COMMON = dict(horizon=15, rate=10.0)
 PATH = "configs/path_L_turn.yaml"
@@ -35,7 +36,8 @@ def test_bag_record_command():
     cmd = bag_record_command("/tmp/batch_l2_r1")
     assert cmd.startswith(f"{ROS_SETUP} && ")
     assert "ros2 bag record -o /tmp/batch_l2_r1" in cmd
-    for topic in ("/odom", "/rover_twist", "/path_error", "/mpc_solve_ms"):
+    for topic in ("/odom", "/rover_twist", "/path_error", "/mpc_solve_ms",
+                  "/mpc_solve_iters"):
         assert topic in cmd
 
 
@@ -81,3 +83,13 @@ def test_node_command_defaults_cmd_delay_to_zero():
                        dict(horizon=15, rate=10.0),
                        "configs/path_L_turn_1m.yaml")
     assert "-p cmd_delay_steps:=0" in cmd
+
+
+def test_ssh_hosts_defaults_are_preserved(monkeypatch):
+    monkeypatch.delenv("SSH_HOSTS", raising=False)
+    assert ssh_hosts() == SSH_HOSTS
+
+
+def test_ssh_hosts_can_be_overridden_for_university_network(monkeypatch):
+    monkeypatch.setenv("SSH_HOSTS", "10.20.30.40, 10.20.30.41")
+    assert ssh_hosts() == ["10.20.30.40", "10.20.30.41"]

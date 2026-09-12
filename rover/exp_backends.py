@@ -10,6 +10,7 @@ RealBackend: SSHでRPiのノード起動・bag記録・回収を行う実機用�
 """
 
 import math
+import os
 import random
 import shlex
 import shutil
@@ -23,8 +24,8 @@ from pathlib import Path
 import yaml
 
 from exp_metrics import compute_metrics, dist_to_polyline
-from follower_core import (clamp, goal_crossed, goal_scaled_vr, kanayama_cmd,
-                           reference_pose, tracking_error)
+from follower_core import (CommandDelay, clamp, goal_crossed, goal_scaled_vr,
+                           kanayama_cmd, reference_pose, tracking_error)
 from mpc_core import MPCFollower
 
 V_MAX, W_MAX = 0.15, 2.0          # mpc_follower.py と同値
@@ -64,6 +65,7 @@ def sim_run(cond, common, waypoints, v_r, sim_opts, timeout_s, seed):
     # CommandDelay が同じ意味で効くので、同じ yaml を sim/real で比較できる
     delay = (int(sim_opts.get('delay_steps', 2))
              + int(cond.get('cmd_delay_steps', 0)))
+    cmd_delay = CommandDelay(delay)
     pn = float(sim_opts.get('pos_noise', 0.0))
     yn = float(sim_opts.get('yaw_noise', 0.0))
     init_lat = float(sim_opts.get('init_lat', 0.0))
@@ -84,7 +86,6 @@ def sim_run(cond, common, waypoints, v_r, sim_opts, timeout_s, seed):
 
     # 開始直線は +x 向きなので、横ずれは y 方向に載る
     x, y, th, t = 0.0, init_lat, init_yaw, 0.0
-    buf = deque()
     twist, perr, terr, solve_ms, iters = [], [], [], [], []
     ok = False
     while t < timeout_s:
@@ -109,9 +110,8 @@ def sim_run(cond, common, waypoints, v_r, sim_opts, timeout_s, seed):
         else:
             v, w = kanayama_cmd(x_e, y_e, th_e, vr, **KAN_GAINS)
             cmd = (clamp(v, V_MAX), clamp(w, W_MAX))
-        # 入力遅延: delay 前の指令を適用（sim_delay_probe.py と同一）
-        buf.append(cmd)
-        v, w = buf.popleft() if len(buf) > delay else (vr, 0.0)
+        # 実機ノードと同じ CommandDelay を通し、遅延セマンティクスを構造的に統一
+        v, w = cmd_delay.push(cmd, (vr, 0.0))
         twist.append((t, v, w))
         perr.append((t, y_e))
         terr.append((t, dist_to_polyline(waypoints, x, y)))
@@ -166,6 +166,13 @@ STARTUP_MARGIN_S = {'kanayama': 15, 'l2': 90, 'l1': 90}  # cvxpy import 30-60s
 # ssh ... bash -lc は非対話shellのため .bashrc が早期returnしROS環境が
 # 通らない（rclpy ImportError等）。setup.bash を毎回明示sourceする。
 ROS_SETUP = 'source /opt/ros/humble/setup.bash 2>/dev/null'
+
+
+def ssh_hosts():
+    """接続候補を返す。大学など別ネットワークでは SSH_HOSTS で上書き可能。"""
+    raw = os.environ.get('SSH_HOSTS', '')
+    hosts = raw.replace(',', ' ').split()
+    return hosts or list(SSH_HOSTS)
 
 
 def node_command(cond, common, path_file):
@@ -256,12 +263,13 @@ class RealBackend:
 
     def preflight(self):
         """SSH疎通・nav_base稼働・コード同期を確認（バッチ開始時に1回）。"""
+        hosts = ssh_hosts()
         if self.dry_run:
-            self.host = SSH_HOSTS[0]
+            self.host = hosts[0]
             print(f'[dry-run] preflight: ssh {SSH_USER}@{self.host} で '
                   f'ros2 node list / md5sum 確認を行う')
             return
-        for h in SSH_HOSTS:
+        for h in hosts:
             try:
                 if subprocess.run(['ssh', '-o', 'ConnectTimeout=5',
                                    f'{SSH_USER}@{h}', 'true'],
@@ -271,7 +279,7 @@ class RealBackend:
             except subprocess.TimeoutExpired:
                 pass
         if self.host is None:
-            raise RuntimeError(f'RPiにSSH接続できません: {SSH_HOSTS}')
+            raise RuntimeError(f'RPiにSSH接続できません: {hosts}')
         print(f'RPi接続: {self.host}')
 
         nodes = self._ssh('source /opt/ros/humble/setup.bash 2>/dev/null; '

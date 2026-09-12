@@ -6,18 +6,7 @@ S2 の中心的主張「move_suppress=2.0 は遅延マージンを買ってい�
 exp_backends.sim_run と完全に一致していなければならない。
 """
 
-from collections import deque
-
 from follower_core import CommandDelay
-
-
-def sim_reference(cmds, delay, fill):
-    """exp_backends.sim_run の遅延と同じ計算（一致確認の基準）。"""
-    buf, out = deque(), []
-    for c in cmds:
-        buf.append(c)
-        out.append(buf.popleft() if len(buf) > delay else fill)
-    return out
 
 
 def test_zero_steps_is_identity():
@@ -35,14 +24,29 @@ def test_two_steps_delays_by_two():
     assert d.push((0.0, 4.0), fill) == (0.0, 2.0)
 
 
-def test_matches_the_sim_delay_semantics():
-    """sim と実機で遅延の意味がずれたら R16 が成立しないので固定する。"""
-    cmds = [(0.1, w / 10.0) for w in range(12)]
-    fill = (0.1, 0.0)
-    for delay in (0, 1, 2, 3):
-        d = CommandDelay(delay)
-        got = [d.push(c, fill) for c in cmds]
-        assert got == sim_reference(cmds, delay, fill), f'delay={delay}'
+def test_sim_uses_command_delay_with_baseline_plus_injected_steps(monkeypatch):
+    """simも実機と同じCommandDelayを直接使い、手写し実装を持たない。"""
+    import exp_backends
+
+    calls = {"steps": None, "pushes": []}
+
+    class SpyDelay:
+        def __init__(self, steps):
+            calls["steps"] = steps
+
+        def push(self, cmd, fill):
+            calls["pushes"].append((cmd, fill))
+            return fill
+
+    monkeypatch.setattr(exp_backends, "CommandDelay", SpyDelay)
+    exp_backends.sim_run(
+        dict(name="k", controller="kanayama", cmd_delay_steps=3),
+        dict(rate=10.0), [(0.0, 0.0), (1.0, 0.0)], 0.1,
+        dict(delay_steps=2), timeout_s=0.11, seed=1)
+
+    assert calls["steps"] == 5
+    assert calls["pushes"]
+    assert calls["pushes"][0][1] == (0.1, 0.0)
 
 
 def test_reset_drops_pending_commands():

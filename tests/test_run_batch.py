@@ -30,6 +30,23 @@ def test_load_batch_rejects_bad_controller(tmp_path):
         load_batch(str(f))
 
 
+@pytest.mark.parametrize("value", [-1, 1.5, True])
+def test_load_batch_rejects_invalid_command_delay(tmp_path, value):
+    f = tmp_path / "b.yaml"
+    f.write_text(BATCH_YAML.replace(
+        "controller: l2", f"controller: l2, cmd_delay_steps: {value}"))
+    with pytest.raises(ValueError, match="cmd_delay_steps"):
+        load_batch(str(f))
+
+
+def test_load_batch_rejects_command_delay_for_kanayama(tmp_path):
+    f = tmp_path / "b.yaml"
+    f.write_text(BATCH_YAML.replace(
+        "controller: l2", "controller: kanayama, cmd_delay_steps: 1"))
+    with pytest.raises(ValueError, match="Kanayama"):
+        load_batch(str(f))
+
+
 def test_append_and_resume(tmp_path):
     csv_path = tmp_path / "runs.csv"
     row = {c: "" for c in CSV_COLUMNS}
@@ -56,6 +73,32 @@ def test_make_row():
     assert row["ok"] is True and row["rmse_cm"] == 2.0
     assert row["git_hash"] == "abc123" and row["v_r"] == 0.1
     assert set(row) == set(CSV_COLUMNS)
+
+
+def test_make_row_records_command_delay():
+    batch = dict(name="mini", common=dict(horizon=15))
+    cond = dict(name="delayed", controller="l1", lam=0.3,
+                cmd_delay_steps=3)
+    result = dict(ok=True, metrics={}, bagdir="", note="")
+    row = make_row(batch, cond, 1, "sim", result, "abc123", v_r=0.1)
+    assert "cmd_delay_steps" in CSV_COLUMNS
+    assert row["cmd_delay_steps"] == 3
+
+
+def test_make_row_defaults_command_delay_to_zero():
+    batch = dict(name="mini", common={})
+    cond = dict(name="plain", controller="l2")
+    result = dict(ok=True, metrics={}, bagdir="", note="")
+    row = make_row(batch, cond, 1, "sim", result, "abc123", v_r=0.1)
+    assert row["cmd_delay_steps"] == 0
+
+
+@pytest.mark.parametrize("name", ["load500", "load1000"])
+def test_university_load_configs_show_manual_command(name):
+    from pathlib import Path
+    text = Path(f"configs/batch_Lturn1m_{name}.yaml").read_text()
+    assert "--backend real --manual" in text
+    assert "--backend real --auto" not in text
 
 
 def test_write_summary(tmp_path):
