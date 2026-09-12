@@ -175,3 +175,25 @@ def test_zero_flip_conditions_have_no_relative_difference(pairs):
     assert flips["l2"]["sim"] == 0 and flips["l2"]["real"] == 0
     assert flips["l2"]["rel_diff"] is None
     assert flips["l1_ms2"]["rel_diff"] == pytest.approx(0.0)
+
+
+def test_load000_batch_includes_kanayama_baseline():
+    """表6.5 を大学・2代目で一本化するにはベースラインが要る
+    （設計: specs/2026-09-12-大学実験環境への移行-design.md）。"""
+    from run_batch import load_batch
+    b = load_batch("configs/batch_Lturn1m_load000.yaml")
+    names = [c["name"] for c in b["conditions"]]
+    assert "kanayama" in names
+    assert len(b["conditions"]) == 4
+
+
+def test_delay_batch_compares_move_suppress_under_injected_delay():
+    """R16: w_ms=0.5 と 2.0 を人工遅延 1〜3step で比較する。"""
+    from run_batch import load_batch
+    b = load_batch("configs/batch_Lturn1m_delay.yaml")
+    pairs = {(c.get("move_suppress"), c.get("cmd_delay_steps"))
+             for c in b["conditions"]}
+    for ms in (0.5, 2.0):
+        for d in (1, 2, 3):
+            assert (ms, d) in pairs, f"ms={ms} delay={d} が無い"
+    assert b["repeats"] == 3

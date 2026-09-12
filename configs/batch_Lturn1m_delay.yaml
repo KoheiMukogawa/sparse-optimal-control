@@ -1,0 +1,20 @@
+# R16 人工遅延注入: move_suppress=0.5 と 2.0 を遅延1〜3stepで比較（18走行）
+# S2 の主張「w_ms=2.0 は遅延マージンを買っている」を実機で直接検証する
+# 唯一の実験。sim の予測（w_ms=0.5 は遅延+2step で崩壊・2.0 は保つ）と
+# 突き合わせる。cmd_delay_steps は mpc_follower の指令バッファへ渡る。
+# 実行: uv run python rover/run_batch.py configs/batch_Lturn1m_delay.yaml \
+#         --backend real --manual --outdir results/<日付>_delay
+name: Lturn1m_delay
+path_file: configs/path_L_turn_1m.yaml
+backend: real
+repeats: 3
+timeout_s: 60
+common: {horizon: 15, rate: 10.0}
+sim: {delay_steps: 2, pos_noise: 0.0, yaw_noise: 0.0}
+conditions:
+  - {name: ms05_d1, controller: l1, lam: 0.3, move_suppress: 0.5, cmd_delay_steps: 1}
+  - {name: ms05_d2, controller: l1, lam: 0.3, move_suppress: 0.5, cmd_delay_steps: 2}
+  - {name: ms05_d3, controller: l1, lam: 0.3, move_suppress: 0.5, cmd_delay_steps: 3}
+  - {name: ms20_d1, controller: l1, lam: 0.3, move_suppress: 2.0, cmd_delay_steps: 1}
+  - {name: ms20_d2, controller: l1, lam: 0.3, move_suppress: 2.0, cmd_delay_steps: 2}
+  - {name: ms20_d3, controller: l1, lam: 0.3, move_suppress: 2.0, cmd_delay_steps: 3}
