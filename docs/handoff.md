@@ -1,7 +1,98 @@
-# Handoff - 2026-09-12
+# Handoff - 2026-09-14
 
 過去セッション（2026-06-12〜2026-07-15）の全文は
 `docs/作業記録/handoff_archive.md` に退避（必要時のみ参照）。
+
+## 2026-09-14 セッション（別RPiのSDカードをレスキューイメージから復旧）
+
+- **別の実機RPiが welcome画面で止まる問題を解決した。** 原因はSDカードに
+  **素の Ubuntu 24.04.4（2026-02-11ビルド）が焼かれていただけ**だったこと。
+  `/home` が空、uid>=1000 のユーザーが存在せず、`/var/lib/cloud/instance/boot-finished`
+  も無い＝cloud-init の初回セットアップが未完走の状態だった。作業環境ではなかった
+- **2026-07-20 取得のレスキューイメージ `~/sd_rescue.img` を書き戻して復旧・起動確認済み。**
+  中身は Ubuntu 22.04.5 / hostname `rpi` / user `mukougawakouhei` / `/opt/ros/humble` /
+  `ros2_ws/src`（lightrover_ros2, ydlidar_ros2_driver）/ `rover/` / `sparse_control/` /
+  `map_room*.pgm` / `bags/`。cloud-init はパージ済みなので welcome画面は出ない
+- **`sd_rescue.img` と `sd_rescue_orig.img` はホームに温存すること（消さない）。**
+  両者はファイル内容は完全に同一（ddrescue完走後に更新されたファイルは0件）で、差分は
+  ext4スーパーブロックとグループディスクリプタのみ。`sd_rescue.img` の方が一度マウントされて
+  ジャーナル再生済み＝クリーンなので、**書き戻しにはこちらを使う**
+
+### 復旧後にやったこと（同日中に完了）
+
+- **`rover/` を再デプロイ済み**（32ファイル、うち12ファイルは新規:
+  `homing.py` `truth_live.py` `survey_tags.py` `preview_camera.py` `udp_twist_bridge.py`
+  `thesis_data.py` `bench_warmstart.py` `openloop_sparse.py` `fig_style.py`
+  `sweep_delay.py` `sweep_disturb.py` `sweep_grid.py`）。
+  `rsync -av --exclude='__pycache__' rover/ mukougawakouhei@<RPiのIP>:~/rover/`
+  で転送し、RPi上で `python3 -m py_compile *.py` 全通過、主要モジュールの import も確認
+  （RPiは Python 3.10.12 / numpy 1.26.4 / scipy 1.15.3 / osqp 1.1.2）
+- パーティション・ファイルシステムとも **59GBまで自動拡張されていた**（cloud-init は
+  無いが growroot 相当が効いた）。`growpart` は `NOCHANGE`、`resize2fs` も
+  `Nothing to do!` で、手当て不要だった
+- **`analyze_bag.py` が使う `rosbags` はRPiに未インストール**。bag解析はラップトップ側で
+  やる想定なら不要。RPiで解析するなら `pip install rosbags`
+
+### DDS設定を全面的に書き直した（重要）
+
+**復元直後は ROS2 が完全に壊れていた。** `~/cyclonedds_rpi.xml` が
+`NetworkInterfaceAddress` に `192.168.0.31` をハードコードしており、
+`ros2 topic list` すら `192.168.0.31: does not match an available interface` →
+`rmw_create_node: failed to create domain` で失敗した。**IPが変わる運用では必ず再発する。**
+
+対策として、両側の設定を**IPを書かない形**に置き換えた（旧版は `*.bak-20260914` で温存）:
+
+```xml
+<Interfaces>
+  <NetworkInterface autodetermine="true" />
+  <NetworkInterface name="lo" presence_required="false" multicast="true" />
+</Interfaces>
+<AllowMulticast>false</AllowMulticast>
+<Discovery><Peers><Peer Address="localhost" /></Peers> ... </Discovery>
+```
+
+- RPi: `~/cyclonedds_rpi.xml` → `ros2 topic list` 復旧、`/ddstest` の pub/sub 往復も確認
+- laptop: `~/scripts/cyclonedds_laptop.xml` → 同内容（`ddsperf` で読み込みエラーなしを確認）
+- `NetworkInterfaceAddress` は deprecated。`<Interfaces><NetworkInterface>` が現行形式
+
+**laptop↔RPi の DDS は元々不要**だと確認できた。`udp_twist_bridge.py` の docstring に
+「laptop の homing からの速度指令を流す唯一の入口。走行フェーズでは使わない
+（follower は RPi 内で完結）」とある。実際 **WSLのROS2はros2 CLIもrclpyも入っていない
+部分インストール**（ros-jazzy系77パッケージはあるが ros2cli / ros-base は無し）。
+WSLはNAT（`172.24.x`）でRPiから到達できないが、**WSL→RPi のUDP片方向は疎通確認済み**
+なので homing のパスは成立する。`.wslconfig` を mirrored にする必要はない。
+
+### ネットワーク運用メモ（大学）
+
+- テザリングの実SSIDは **`16pro`**（Wi-Fiプロファイル名「みれいのiPhone」とは別物。
+  プロファイル名で `netsh wlan connect` しても繋がらない）
+- iPhoneのインターネット共有は**接続端末がゼロになると自動で止まる**。ラップトップが
+  eduroamに取られるとRPiごと落ちるので、**eduroamの自動接続を手動に変更した**
+  （戻す: `netsh wlan set profileparameter name="eduroam" connectionmode=auto`）
+- RPi探索は `for i in $(seq 1 14); do (echo > /dev/tcp/172.20.10.$i/22) ...` の総当たりが速い
+  （iPhoneテザリングは /28 で13台分しかない）。今回RPiは毎回 `172.20.10.2`
+- ラップトップからRPiへは**SSH鍵認証が通る**（復元イメージに authorized_keys が残っていた）。
+  モニタ手打ちに頼らずラップトップ側から全部操作できる
+- `~/auto_network.sh` は壊れている（`#!/vin/bash`、`grep "itnet "` の誤字）。今は
+  NetworkManager が wlan0 を管理しているので実害はないが、当てにしないこと
+
+### 手順・ハマりどころ（次回のため）
+
+- **WSLへのUSB受け渡しは `wsl --mount` では不可。** カードリーダー経由のSDは
+  `MediaType: Removable Media` になり `Wsl/Service/AttachDisk/MountDisk/0x8007000f` で失敗する
+  （失敗するとディスクがOfflineのまま残るので `Set-Disk -Number N -IsOffline $false` で戻す）。
+  **usbipd-win を使う**: WSL側に `linux-tools-virtual hwdata` を入れて
+  `/usr/local/bin/usbip` へシンボリックリンク → 管理者PowerShellで `usbipd bind/attach`
+- **カードリーダー `0bda:0309` は読み出しでも脱落する。** attach後10秒で
+  `vhci_hcd: connection closed` → Windows の `usbipd list` からもBUSIDごと消えた。
+  今回の書き戻し（1h40m, 30GB）はたまたま完走したが信頼はできない。**大容量転送は別リーダーで**
+- **やらかし2件**:
+  - 手順書の `/dev/sdX` をそのまま実行すると、`/dev` は tmpfs なので
+    **RAM上に通常ファイルが作られる**（1.4GBでtmpfsが97%に）。デバイス名は毎回 `lsblk` で確認する
+  - 失敗した実行が作ったマップファイルを再利用すると、ddrescue が
+    「先頭1473MBはコピー済み」と判断して**スキップし、継ぎ接ぎの壊れたカードになる**。
+    実行前に `ls ~/sd_write*.map` で既存を確認し、必ず新規名を使う
+    （`Initial status` の行が出たらスキップが起きている合図）
 
 ## 2026-09-12 セッション（大学実験環境への移行・実機なし実装完了）
 
