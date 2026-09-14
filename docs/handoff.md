@@ -94,6 +94,63 @@ WSLはNAT（`172.24.x`）でRPiから到達できないが、**WSL→RPi のUDP�
     実行前に `ls ~/sd_write*.map` で既存を確認し、必ず新規名を使う
     （`Initial status` の行が出たらスキップが起きている合図）
 
+### 実機スタックの起動確認（モータ非駆動で完了）
+
+**この機体は LiDAR 非搭載**（`lsusb` にUSBシリアルなし、カメラC270も未接続）。
+そのため純正の `nav_base.launch.py` は**使えない**——`ydlidar_x2_launch.py` を
+無条件に include するため必ずエラーになる。
+
+**ただし実験に LiDAR は不要**であることを確認した。`mpc_follower.py` の購読は `odom` のみ、
+`rover/*.py` 全体で `LaserScan`・`/scan`・`ydlidar`・`slam` への参照はゼロ。
+SLAM・マッピングができないだけで、**R1〜R16 の実験は全て実施可能**。
+
+制御の実トポロジ:
+
+```
+mpc_follower ──/rover_twist──> pos_controller ──/wrc201_i2c(srv)──> i2c_controller ──> WRC201基板
+odom_manager ──/odom────────> mpc_follower, pos_controller
+```
+
+**`rover/start_nav_base.sh` を新規追加**（LiDARなし構成で必要な3ノードだけ起動）。
+多重起動ガード（事故歴対策）・起動直後の零速度配信・停止時の零速度＋出力イネーブル解除を含む。
+検証済み: 3ノード起動 / 2回目の実行を拒否 / SIGTERM で残骸ゼロ / 停止後 `O_EN=0` に復帰。
+
+**安全上の重要事項（新規に判明）**:
+
+- **`pos_controller` は起動しただけでモータ出力を有効化する。** `main()` で
+  `MU8_O_EN(0x10)=0x03` を書く（ゲイン設定 `MS16_FB_PG0/PG1`・`MU16_FB_PCH0/PCH1` も同時）。
+  速度は書かないが、**基板は電源が入っている間ずっと速度レジスタの前回値を保持する**ので、
+  非ゼロだとイネーブルONの瞬間に走り出す。今回は起動前に読んで
+  `MS32_A_POS0/POS1(0x48/0x4c)` が両輪0であることを実測してから起動した。
+  **今後も初回起動時は車輪を浮かせること。**
+- `pos_controller` に出力を落とす処理は無い。停止しても `O_EN=3` のまま残るので、
+  `start_nav_base.sh` の cleanup で明示的に 0 を書いている
+- **odom は起動時にゼロリセットされない**（基板の積算値を読む。今回 `x=-5.196m`,
+  `yaw=-24.4°` から始まった）。走行前に `homing.py` で原点復帰すること
+
+**確認できたこと**: `/wrc201_i2c` サービス起動、`/odom` を **31.9Hz** で安定配信
+（std dev 1.3ms）、`/tf` 配信、手で車輪を回すと odom が追随（1.83cm / -13.87°）、
+指令なしでは完全静止（3サンプル最下位桁まで一致・twist厳密に0）。
+**エンコーダ → I2C → odom積算 の経路は健全。R4（実走行スモーク）の前提条件はクリア。**
+
+**未確認**: モータ駆動そのもの（速度指令を一切出していない）＝ R4 本体。
+カメラ真値（C270未接続）。
+
+### 詰まったところ（次回のため）
+
+- `set -u` は ROS の `setup.bash` と衝突する（`AMENT_TRACE_SETUP_FILES: unbound variable`）。
+  source の間だけ `set +u` にする
+- **`ros2 run` 経由で起動すると `$!` がラッパーのPIDになり、kill してもノード本体が生き残る。**
+  ノード本体（`install/lightrover_ros/lib/lightrover_ros/<node>`）を直接 `python3` で
+  起動すればPIDが実体と一致する
+- **`pkill -f` / `pgrep -f` はSSHのリモートコマンド文字列自身にマッチして自滅・誤検出する。**
+  PID指定で kill するか、`[i]2c_controller` のようなブラケット回避を使う
+- 非対話シェルからバックグラウンド起動したプロセスは **SIGINT が無視として継承され
+  `trap` で上書きできない**（POSIX）。スクリプトの停止テストは SIGTERM で行うこと。
+  端末で前面実行すれば Ctrl-C は正常に効く
+- `vcgencmd` が `VCHI initialization failed` で使えない（低電圧警告をCLIで確認できない）。
+  ユーザーを `video` グループに入れれば直るはず・未対応
+
 ## 2026-09-12 セッション（大学実験環境への移行・実機なし実装完了）
 
 - 計画 `docs/superpowers/plans/2026-09-12-大学実験環境への移行.md` の全5タスクを
