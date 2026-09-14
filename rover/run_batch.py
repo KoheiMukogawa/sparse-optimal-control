@@ -427,6 +427,10 @@ def main():
     ap.add_argument('--manual', action='store_true',
                     help='走行後に方眼の読み値を手入力して truth_* 列を埋める'
                          '（カメラを置けない環境用。--auto とは併用不可）')
+    ap.add_argument('--pause', action='store_true',
+                    help='走行ごとに Enter 待ちで停止する（数値は求めない）。'
+                         '外部計測をせず機体を手で戻す運用向け。'
+                         'truth_* は欠測のまま。--manual/--auto とは併用不可')
     args = ap.parse_args()
 
     from exp_backends import SimBackend, load_path
@@ -446,6 +450,8 @@ def main():
         raise SystemExit('--auto / --home-only は --backend real 専用です')
     if args.manual and args.auto:
         raise SystemExit('--manual と --auto は併用できません')
+    if args.pause and (args.manual or args.auto):
+        raise SystemExit('--pause は --manual / --auto と併用できません')
     if backend_kind == 'sim':
         backend = SimBackend(batch)
     else:
@@ -549,6 +555,22 @@ def main():
                 else:
                     print(f"[手計測] {cond['name']} rep{rep}: "
                           '走行失敗のため手計測はスキップします')
+            elif args.pause and not args.dry_run:
+                # 外部計測をしない走行でも、機体をスタート位置へ戻すための
+                # 停止は要る（--auto のカメラ原点復帰が使えない環境）。
+                # --manual は終点入力が必須なので、測っていないと数値の
+                # でっち上げを迫ることになる。ここでは数値を一切求めない。
+                try:
+                    ans = input(f"\n[待機] {cond['name']} rep{rep} 完了。"
+                                '機体をスタート位置へ戻して Enter'
+                                '（q で中断）: ')
+                except KeyboardInterrupt:
+                    print('\nバッチ中断')
+                    return
+                if ans.strip().lower() == 'q':
+                    print('中断しました')
+                    append_row(csv_path, row)
+                    return
             append_row(csv_path, row)
             m = result.get('metrics', {})
             truth_part = (f" 真値終点={tm['truth_end_dist_cm']:.1f}cm"
