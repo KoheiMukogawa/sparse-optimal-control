@@ -19,6 +19,7 @@
   図4.10  バッチ1サイクルのシーケンス        （模式）
   図5.1   N に対する求解時間                 （results/2026-06-13_rpi_bench/）
   図5.8   第5章の総括                        （模式）
+  図5.9   人工遅延注入下の ω(t)              （results/2026-09-14_delay/）
   図6.1   経路形状と座標定義                 （configs/path_L_turn.yaml）
   図7.1   遅延による切替制御の限界振動       （数値計算）
   図7.2   λ=2 の見かけの最適                 （results/2026-07-26_delay_sweep/delay.csv）
@@ -43,6 +44,7 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 OUT = "results/2026-08-2_thesis_figs2".replace("2026-08-2", "2026-08-02")
 DELAY_CSV = "results/2026-07-26_delay_sweep/delay.csv"
+DELAY_BAGS = "results/2026-09-14_delay"
 
 # ---------------------------------------------------------------- 模式図の部品
 
@@ -663,13 +665,67 @@ def fig5_8():
     save(fig, "fig5_8_summary.png")
 
 
+def fig5_9():
+    """図5.9 人工遅延注入下の ω(t)（実機・各代表1本）。
+
+    5.8 節の表5.11b を絵にしたもの。両条件とも ω は上限 2.0 に達しており、
+    **上限に当たるかどうかでは差がつかない**。差は「上限に張り付いている時間」に
+    あるので、飽和判定 |ω|>1.5 を満たす時間帯を縦に塗って可視化する。
+    符号反転回数がこの差を捉えられないことを示すのが目的（7.4.1 節）。
+    """
+    from analyze_bag import read_bag
+    from exp_metrics import V_ACTIVE, W_SAT, compute_metrics
+
+    runs = [("ms05_d3_r1", "l1", "$w_{ms}$ = 0.5"),
+            ("ms20_d3_r1", "l1_ms2", "$w_{ms}$ = 2.0")]
+    if not all(os.path.isdir(os.path.join(DELAY_BAGS, n)) for n, _, _ in runs):
+        print(f"  skip fig5_9: {DELAY_BAGS} の bag が無い")
+        return
+
+    fig, axes = plt.subplots(2, 1, figsize=(7.2, 5.4), sharex=True, sharey=True)
+    for ax, (name, cond, label) in zip(axes, runs):
+        twist, perr, solve, iters = read_bag(os.path.join(DELAY_BAGS, name))
+        m = compute_metrics(twist, perr, solve, iters)
+        active = [(t, v, w) for t, v, w in twist if abs(v) > V_ACTIVE] or twist
+        t0 = active[0][0]
+        ts = np.array([t - t0 for t, _, _ in active])
+        ws = np.array([w for _, _, w in active])
+
+        # 飽和している時間帯を縦に塗る（この面積の割合が飽和率）
+        ax.fill_between(ts, -2.4, 2.4, where=np.abs(ws) > W_SAT,
+                        color=FS.COLOR[cond], alpha=0.16, linewidth=0,
+                        step="mid", zorder=0)
+        ax.axhline(0, color="0.6", lw=0.8, zorder=1)
+        for s_ in (2.0, -2.0):
+            ax.axhline(s_, color="0.25", ls=":", lw=0.9, zorder=1)
+        for s_ in (W_SAT, -W_SAT):
+            ax.axhline(s_, color=FS.INK_MUTED, ls="--", lw=0.7, zorder=1)
+        ax.plot(ts, ws, color=FS.COLOR[cond], lw=1.2, zorder=3)
+
+        ax.set_ylim(-2.4, 2.4)
+        ax.set_ylabel("ω [rad/s]")
+        ax.set_title(
+            f"{label}  —  飽和率 {m['sat_ratio']*100:.1f} %, "
+            f"符号反転 {int(m['flips'])} 回, Σ|u| {m['sum_u']:.2f}",
+            loc="left")
+
+    axes[-1].set_xlabel("走行開始からの時間 [s]")
+    fig.suptitle("図5.9  人工遅延注入下の ω(t)（注入 3 step・実機・各代表1本）")
+    # 凡例は図の外（下端）へ。データ領域の線と重ねない
+    fig.text(0.5, 0.012,
+             "点線 = 上限 ±2.0 ／ 破線 = 飽和判定 |ω| = 1.5 ／ 帯 = 飽和区間",
+             ha="center", va="bottom", fontsize=8, color=FS.INK_MUTED)
+    fig.tight_layout(rect=(0, 0.035, 1, 1))
+    save(fig, "fig5_9_delay_saturation.png")
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     FS.setup()
     print(f"出力: {OUT}")
     for fn in (fig1_3, fig3_1, fig3_2, fig3_3, fig4_1, fig4_3, fig4_5,
                fig4_6, fig4_7, fig4_8, fig4_9, fig4_10, fig5_1, fig5_8, fig6_1,
-               fig7_1, fig7_2):
+               fig5_9, fig7_1, fig7_2):
         fn()
     print("完了")
 
