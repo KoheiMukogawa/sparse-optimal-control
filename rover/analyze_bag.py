@@ -3,7 +3,7 @@
 
 評価指標（卒論4指標）:
   - 横偏差RMSE    : /path_error.y のRMS（追従精度）
-  - 消費エネルギー: Σ(|v|+|ω|)·dt の代理（/rover_twist）
+  - 消費エネルギー: Σ(|v|+|ω|)·dt の代理（/rover_twist）。v/ω の内訳も出す
   - 入力スパース性: |ω|<閾 のステップ率（操舵の疎度）
   - 計算負荷      : /mpc_solve_ms の p50/p95/max（実機求解時間）
 
@@ -72,12 +72,14 @@ def main():
     rows = [analyze(b) for b in args.bags]
 
     hdr = (f"{'bag':<26} {'走行s':>6} {'RMSE_cm':>8} {'Σ|u|':>7} "
+           f"{'Σ|v|':>6} {'Σ|ω|':>6} "
            f"{'ω0率':>6} {'反転':>4} {'飽和':>5} {'解p50':>6} {'解p95':>6} {'解max':>6}")
     print(hdr)
     print("-" * len(hdr))
     for r in rows:
         print(f"{r['name']:<26} {r['drive_s']:>6.1f} {r['rmse_cm']:>8.2f} "
-              f"{r['sum_u']:>7.2f} {r['w_zero_ratio']*100:>5.0f}% "
+              f"{r['sum_u']:>7.2f} {r['sum_u_v']:>6.2f} {r['sum_u_w']:>6.2f} "
+              f"{r['w_zero_ratio']*100:>5.0f}% "
               f"{r['flips']:>4d} {r['sat_ratio']*100:>4.0f}% "
               f"{r['solve_p50']:>5.1f} {r['solve_p95']:>5.1f} {r['solve_max']:>5.1f}")
     print("\n注: 空転bagのRMSEは仮想odom追従の参考値（外乱なし）。"

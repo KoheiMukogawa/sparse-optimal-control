@@ -30,7 +30,8 @@ CSV_COLUMNS = [
     'batch', 'cond', 'rep', 'backend', 'timestamp', 'git_hash',
     'controller', 'lam', 'move_suppress', 'cmd_delay_steps',
     'horizon', 'v_r', 'ok',
-    'drive_s', 'rmse_cm', 'sum_u', 'w_zero_ratio', 'flips', 'sat_ratio',
+    'drive_s', 'rmse_cm', 'sum_u', 'sum_u_v', 'sum_u_w',
+    'w_zero_ratio', 'flips', 'sat_ratio',
     'max_w', 'solve_p50', 'solve_p95', 'solve_max',
     'iters_p50', 'iters_p95', 'iters_max',
     'truth_end_x', 'truth_end_y', 'truth_end_theta',
@@ -111,7 +112,8 @@ def make_row(batch, cond, rep, backend_name, result, git_hash, v_r):
         v_r=v_r, ok=result['ok'],
         bagdir=result.get('bagdir', ''), note=result.get('note', ''),
     )
-    for k in ('drive_s', 'rmse_cm', 'sum_u', 'w_zero_ratio', 'flips',
+    for k in ('drive_s', 'rmse_cm', 'sum_u', 'sum_u_v', 'sum_u_w',
+              'w_zero_ratio', 'flips',
               'sat_ratio', 'max_w', 'solve_p50', 'solve_p95', 'solve_max',
               'iters_p50', 'iters_p95', 'iters_max'):
         if k in m:

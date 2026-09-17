@@ -38,7 +38,11 @@ def compute_metrics(twist, perr=(), solve_ms=(), iters=()):
     t0, t1 = active[0][0], active[-1][0]
     dt = (t1 - t0) / max(1, len(active) - 1)
 
-    sum_u = sum((abs(v) + abs(w)) for _, v, w in active) * dt
+    # v 成分と ω 成分を分けて積算する。式(4.2) は次元の違う量を足しているため、
+    # 条件間の差がどちらに由来するかを示せないと代理指標として使えない（4.3.2 節）。
+    sum_u_v = sum(abs(v) for _, v, _ in active) * dt
+    sum_u_w = sum(abs(w) for _, _, w in active) * dt
+    sum_u = sum_u_v + sum_u_w
     ws = [w for _, _, w in active]
     w_zero = sum(1 for w in ws if abs(w) < W_ZERO) / len(ws)
     sat = sum(1 for w in ws if abs(w) > W_SAT) / len(ws)
@@ -63,6 +67,8 @@ def compute_metrics(twist, perr=(), solve_ms=(), iters=()):
         steps=len(active),
         rmse_cm=rmse_cm,
         sum_u=sum_u,
+        sum_u_v=sum_u_v,
+        sum_u_w=sum_u_w,
         w_zero_ratio=w_zero,
         flips=flips,
         sat_ratio=sat,

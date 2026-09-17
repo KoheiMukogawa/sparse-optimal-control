@@ -31,6 +31,17 @@ def test_basic_metrics():
     assert m["solve_max"] == pytest.approx(30.0)
 
 
+def test_sum_u_breakdown():
+    """Σ|u| の v 成分と ω 成分の内訳（式(4.2)の次元不整合の検証に使う）。"""
+    twist, perr, solve_ms = make_series()
+    m = compute_metrics(twist, perr, solve_ms)
+    # dt=0.1、Σ|v|·dt = 10*0.1*0.1、Σ|ω|·dt = 6.0*0.1
+    assert m["sum_u_v"] == pytest.approx(0.1)
+    assert m["sum_u_w"] == pytest.approx(0.6)
+    # 内訳の和は必ず Σ|u| に一致する
+    assert m["sum_u_v"] + m["sum_u_w"] == pytest.approx(m["sum_u"])
+
+
 def test_no_perr_no_solve():
     twist, _, _ = make_series()
     m = compute_metrics(twist)
