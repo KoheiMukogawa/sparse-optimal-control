@@ -134,14 +134,19 @@ def write_outputs(sol, outdir, x0):
 
 
 def _plot(sol, png_path):
-    """図2.5: 誤差の収束と、3値をとる操舵入力 δω。"""
+    """図2.5: 誤差の収束と、3値をとる操舵入力 δω。
+
+    配色・ラベルは fig_style に合わせる（本文の他の図と揃えるため）。
+    **ゼロ/非ゼロの区別に赤と緑を使わないこと。** この対比は本章の中心であり、
+    赤緑は2型色覚で識別できない。形（●／×）との二重符号化も併せて行う。
+    """
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+        import fig_style as FS
+        from fig_style import plt
     except ImportError:
         return
 
+    FS.setup()
     n, h = sol["n"], sol["h"]
     t_state = [k * h for k in range(n + 1)]
     t_input = [k * h for k in range(n)]
@@ -149,34 +154,40 @@ def _plot(sol, png_path):
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7.5, 6), sharex=True)
 
-    ax1.plot(t_state, [x[0] for x in traj], label=r"$\delta x$ [m]")
-    ax1.plot(t_state, [x[1] for x in traj], label=r"$\delta y$ [m]")
+    ax1.plot(t_state, [x[0] for x in traj], color=FS.COLOR["l2"],
+             lw=1.8, label=r"$\delta x$ [m]")
+    ax1.plot(t_state, [x[1] for x in traj], color=FS.COLOR["kanayama"],
+             lw=1.8, ls=(0, (4, 1.5)), label=r"$\delta y$ [m]")
     ax1.plot(t_state, [math.degrees(x[2]) / 30.0 for x in traj],
+             color=FS.COLOR["l1_ms2"], lw=1.8, ls=(0, (1, 1.5)),
              label=r"$\delta\theta$ [deg] $\div$ 30")
-    ax1.axhline(0.0, color="0.6", lw=0.8)
-    ax1.set_ylabel("tracking error")
-    ax1.legend(fontsize=9)
-    ax1.grid(True, alpha=0.3)
+    ax1.axhline(0.0, color=FS.INK_MUTED, lw=0.8)
+    ax1.set_ylabel("追従誤差")
+    ax1.legend()
+    ax1.set_title("誤差は終端でゼロへ収束する", loc="left")
 
     zero = [abs(w) < ZERO_TOL for w in sol["dw"]]
-    ax2.step(t_input, sol["dw"], where="post", color="0.25", lw=1.2)
+    n_zero = sol["dw_zero"]
+    ax2.step(t_input, sol["dw"], where="post", color=FS.INK_MUTED, lw=1.0)
+    # 色相＋マーカー形の二重符号化。灰=ゼロ（手放し）、朱=操舵している瞬間
     ax2.plot([t for t, z in zip(t_input, zero) if z], [0.0] * sum(zero),
-             "o", ms=4, color="tab:green",
-             label=f"exactly zero ({sol['dw_zero']}/{n})")
+             "o", ms=4.5, color=FS.INK_MUTED, markeredgecolor="none",
+             label=f"ゼロ入力（手放し）  {n_zero}/{n} = {100 * n_zero / n:.0f} %")
     ax2.plot([t for t, z in zip(t_input, zero) if not z],
              [w for w, z in zip(sol["dw"], zero) if not z],
-             "o", ms=4, color="tab:red",
-             label=f"active ({n - sol['dw_zero']}/{n})")
-    ax2.axhline(0.0, color="0.6", lw=0.8)
-    ax2.set_ylabel(r"steering correction  $\delta\omega$")
-    ax2.set_xlabel("time [s]")
-    ax2.legend(fontsize=9, loc="lower right")
+             "X", ms=7, color=FS.COLOR["l1"], markeredgecolor="white",
+             markeredgewidth=0.6,
+             label=f"操舵あり  {n - n_zero}/{n}")
+    ax2.axhline(0.0, color=FS.INK_MUTED, lw=0.8)
+    ax2.set_ylabel(r"操舵の補正量 $\delta\omega$")
+    ax2.set_xlabel("時間 [s]")
+    ax2.legend(loc="lower right")
     ax2.set_ylim(-1.35, 1.35)
-    ax2.grid(True, alpha=0.3)
+    ax2.set_title("入力は $\\pm$最大 と 0 の3値のみ（bang-off-bang）", loc="left")
 
-    fig.suptitle("Maximum hands-off (open loop): bang-off-bang steering")
+    fig.suptitle("図2.5  オープンループ最大ハンズオフ制御の解")
     fig.tight_layout()
-    fig.savefig(png_path, dpi=150)
+    fig.savefig(png_path)
     plt.close(fig)
 
 
