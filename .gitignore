@@ -28,3 +28,19 @@ results/
 # ("*:Zone.Identifier" は12行目に既存パターンがあるため重複追記しない)
 *.pdf
 *.jpg
+
+# 研究会の卒論概要（docs/abstract/）
+# 本体リポジトリは PUBLIC。先輩の概要（氏名・学籍番号・研究室写真を含む）と
+# JSME配布の書式ファイルは追跡しない。自分の .tex と図のみを追跡する。
+docs/abstract/*.cls
+docs/abstract/*.sty
+docs/abstract/abstract.*
+docs/abstract/missfont.log
+docs/abstract/fig/
+# LaTeX ビルド成果物
+docs/abstract/*.aux
+docs/abstract/*.log
+docs/abstract/*.dvi
+docs/abstract/*.bbl
+docs/abstract/*.blg
+docs/abstract/*.out
