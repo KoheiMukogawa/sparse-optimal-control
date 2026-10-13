@@ -36,7 +36,9 @@ docs/abstract/*.cls
 docs/abstract/*.sty
 docs/abstract/abstract.*
 docs/abstract/missfont.log
-docs/abstract/fig/
+# サンプルに付属する図のみ除外（自分の図は追跡する）
+docs/abstract/fig/Turtlebot3.jpg
+docs/abstract/fig/e2-comparison.png
 # LaTeX ビルド成果物
 docs/abstract/*.aux
 docs/abstract/*.log
