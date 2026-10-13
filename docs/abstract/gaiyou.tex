@@ -1,16 +1,14 @@
 % 研究会 卒論概要（2段組み1〜2ページ）
 % ビルド: platex gaiyou.tex && platex gaiyou.tex && dvipdfmx gaiyou.dvi
 %
-% 【未確定・提出前に必ず直すこと】
-%   1. 学籍番号（\jauthor のプレースホルダ）
-%   2. 題目（outline.md の仮題目のまま．指導教員と確定すること）
-%   3. 図1 の機体写真が未撮影（R15）．撮れたら fig/robot.jpg に置き、
-%      「システム概要」節のプレースホルダを \includegraphics に差し替える
+% 【確定事項（2026-10-13）】
+%   学籍番号 922086 ／ 題目は outline.md の仮題目のままで可 ／
+%   機体写真は載せない（周知のため不要との判断）
 %
 % 【数値の出所】すべて docs/thesis/ の実データ．創作値は無い．
 %   表1・本文の数値 = 表5.10 / 表6.3（2026-07-15 実機バッチ・n=3）
-%   図2 = results/2026-07-26_thesis_figs/fig5_6_omega_before_after.png（各代表1本）
-%   注意: 図2 のキャプション内数値は代表1本、本文・表1 は n=3 平均なので僅かに違う
+%   図1 = results/2026-07-26_thesis_figs/fig5_6_omega_before_after.png（各代表1本）
+%   注意: 図1 のキャプション内数値は代表1本、本文・表1 は n=3 平均なので僅かに違う
 \documentclass[a4jsme,9pt,dvipdfmx]{jsmepaper_robomec}
 \usepackage{epic,eepic}
 \usepackage{graphicx}
@@ -31,7 +29,7 @@
 
 \jtitle{\Large{農業用ロボットの経路追従におけるスパース最適制御の実機適用}}
 \jauthor{
-         \large{向川 航平（学籍番号）\hspace{27pt}指導教員：小野山 博之}
+         \large{向川 航平（922086）\hspace{27pt}指導教員：小野山 博之}
      }
 \date{}
 \keywords{}
@@ -100,16 +98,8 @@ $L^1$ 項がゼロを生む作用を保ったまま，連続する入力の飛�
 車載計算機は Raspberry Pi 4 であり，
 \textbf{計算資源の限られた実機の上で制御則を実時間で解く}ことが前提となる．
 制御周期は10\,Hz，予測ホライズンは $N=15$ とした．
-
-% TODO(R15): 機体写真を撮影したら fig/robot.jpg に置き、下のプレースホルダを
-% 次の2行に差し替える:
-%   \includegraphics[width=0.75\linewidth]{fig/robot.jpg}
-%   \captionof{figure}{実験に用いた LiteRover}
-\begin{center}
-    \fbox{\parbox[c][30mm][c]{0.7\linewidth}{\centering 機体写真（撮影待ち・R15）}}
-    \captionof{figure}{実験に用いた LiteRover}
-    \label{fig:robot}
-\end{center}
+凸最適化ソルバには OSQP を用い，前時刻の解を初期値とする warm start により
+求解時間を抑えている．$N\le30$ であれば制御周期内に求解できることを実機で確認した．
 
 \section{実験方法}
 屋内の平坦な床面に1.5\,m四方のL字経路を設定し，
