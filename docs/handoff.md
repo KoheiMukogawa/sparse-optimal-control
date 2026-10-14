@@ -1,7 +1,67 @@
-# Handoff - 2026-10-13
+# Handoff - 2026-10-14
 
 過去セッション（2026-06-12〜2026-07-15）の全文は
 `docs/作業記録/handoff_archive.md` に退避（必要時のみ参照）。
+
+## 2026-10-14 セッション（3代目RPi4が起動・環境整備。実機はまだ動かしていない）
+
+**手順1・2が完了した。** 64GBカードは書き戻し済みで、3代目RPi4 が起動して家Wi-Fiに乗っている。
+
+| 項目 | 実測した状態 |
+|---|---|
+| 接続 | `mukougawakouhei@192.168.0.32`（鍵 `~/.ssh/id_ed25519` で passwordless） |
+| rootfs | `/dev/mmcblk0p2` **58G に自動拡張**（使用15G・空き42G。旧32GBから倍増） |
+| OS | Ubuntu **22.04.5 jammy**、`ros-humble` パッケージ 296本（すべて `-1jammy`） |
+| ROS2 ws | `~/ros2_ws/install/setup.bash` あり。`lightrover_ros2` + `ydlidar_ros2_driver` |
+| ベース接続 | **`/dev/ttyAMA0`**（GPIO UART）。`ttyUSB`/`ttyACM` は無いのが正常 |
+| 電源警告 | アンダーボルトの記録なし |
+
+- **`rover/` を rsync 済み**（差分5本: `analyze_bag.py` `exp_metrics.py`
+  `measure_delay_real.py` `openloop_sparse.py` `run_batch.py`）
+- **24.04 へのアップグレードは絶対にしない。** Humble は jammy 専用で noble 向けバイナリが
+  無く、上げると ros-humble 296本が全部サポート外になる（復旧は Jazzy 移行＋
+  自前パッチ入り `lightrover_ros2` の再ビルド）。22.04 のセキュリティ更新は2027年4月まで。
+  → **`/etc/update-manager/release-upgrades` を `Prompt=never` に変更済み**（確認済み）。
+  通常の `apt upgrade` も研究会が終わるまで当てない
+- **`~/sd_rescue_orig.img`（30GB）を削除した**（起動確認が取れたため）。WSL内 84G→54G。
+  **`~/sd_rescue.img` は残してある**（root所有・新カードが死んだ時の唯一の復旧元）
+
+### C: の空きが 458MB しかない（要対応）
+
+`Used 236.4GB / Free 0.46GB`。**昨日の記録「3.5GB」より更に悪化している。**
+WSL内で消しても VHDX は縮まないので圧縮が必要。`/` は `discard` 付きマウント
+（`rw,relatime,discard,...`）なので **`fstrim` は不要**。
+
+```powershell
+wsl --shutdown
+wsl --manage Ubuntu-24.04 --set-sparse true
+```
+
+失敗したら diskpart（管理者）で
+`select vdisk file="C:\Users\mukou\AppData\Local\wsl\{5e769ba1-cf8b-4972-ae1e-451742949b84}\ext4.vhdx"`
+→ `attach vdisk readonly` → `compact vdisk` → `detach vdisk`。
+
+**bag を laptop に rsync すると VHDX が伸びる＝C: の空きを食うので、
+データ取得を始める前に圧縮を済ませること。**
+
+### SSH の入口（毎回思い出すのでここに書く）
+
+- 家Wi-Fi: `connectHOME`（**大文字** HOME）= `192.168.0.32`
+- ホットスポット: `connect` または `ssh rpi`（`~/.ssh/config` の `Host rpi` → 192.168.4.1, `id_rpi`）
+- **`.bashrc` 157行の `connectHome`（小文字）は 192.168.0.27 で古い。繋がらないのはこれが原因。**
+  `~/.ssh/config` に `Host rpi-home` を足して alias を整理する案は保留中（rsync/scp でも使えるため）
+
+### 次にやること（手順3から）
+
+1. **`ROVER_D` 実測と `spin_test` 再較正**（別車体なので必須）。RPi側の現在値は
+   `odometry.py` / `pos_controller.py` ともに `ROVER_D = 0.1514/2.0` で**旧車体の値のまま＝未較正**。
+   放置すると odom 角度が系統的にずれて以降の追従データが全部汚れる。
+   `python3 spin_test.py --ros-args -p target_deg:=90.0 -p omega:=0.4` から
+2. スモーク2本 → 墨出し（無地の大判紙2m角に10cm格子）→ Phase 2（load000・12走行）→ R5
+3. 発表スライドは `docs/第2回研究会発表_経過報告.pptx` を土台に差分更新
+
+**実機を動かす前に: AC給電になっているか確認（バッテリー切れでSD破損の事故歴あり）。
+`nav_base` は1つだけ。起動時は `~/ros2_ws/install/setup.bash` の追いsource。**
 
 ## 2026-10-13 セッション（研究会スプリント開始・概要を完成・実機なし）
 
