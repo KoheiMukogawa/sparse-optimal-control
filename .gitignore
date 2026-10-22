@@ -49,3 +49,6 @@ docs/abstract/*.out
 
 # 提出した成果物のPDFは例外として追跡する（上の *.pdf より後に書くこと）
 !docs/提出物/*.pdf
+
+# 卒論の LaTeX 出力（docs/build_thesis_tex.py で再生成できる）
+docs/thesis/tex/
