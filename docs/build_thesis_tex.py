@@ -15,11 +15,14 @@
 - `**表6.3 ...**` + 直後の表 → `table` 環境（キャプション付き）
 - `>` 引用 → `quote`（小さめ）。ただし各章冒頭の「草稿」バナーは落とす
 - 図は本文で初めて言及した段落の直後に差し込む（HTML 版と同じ規則）。
-  画像が無い図は枠だけ出す
+  画像が無い図は枠だけ出す。**図のパスとキャプションは各章末の「本章の図表」表**
+  から読む（`thesis_figures.py`）。本文からの参照と表の行が食い違えば最後に報告する
+- 参考文献は `docs/thesis/references.md` から `thebibliography` を作って巻末に置く。
+  本文の `[n]` が一覧と一対一か検査する
 
 使い方:
-    python3 docs/build_thesis_tex.py
-    python3 docs/build_thesis_tex.py --check   # ビルド後に番号の整合を検証
+    python3 docs/build_thesis_tex.py --pdf --check   # 変換 → PDF → 整合検証
+    python3 docs/build_thesis_tex.py                 # 変換だけ
 
 出力: docs/thesis/tex/
 """
@@ -36,11 +39,14 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 OUTDIR = os.path.join(HERE, "thesis", "tex")
 sys.path.insert(0, HERE)
 
-from thesis_figures import FIGURES, MISSING  # noqa: E402
+from thesis_figures import (  # noqa: E402
+    CAPTIONS, FIGURES, MISSING, check_references)
 
 CHAPTERS = [f"chapter{i}.md" for i in range(1, 9)]
 FIG_RE = re.compile(r"図(\d+\.\d+)")
 NUL = "\x00"
+# 本文の段落から参照された図番号（登録簿との食い違いを最後に報告する）
+REFERENCED = set()
 
 # ---------------------------------------------------------------- inline
 
@@ -67,6 +73,9 @@ def _restore(text, store):
     for i, s in enumerate(store):
         if s.startswith("`"):
             body = "".join(SPECIALS.get(c, c) for c in s[1:-1])
+            # 長いパスは行末で折れないと版面からはみ出す。区切りで改行を許す
+            body = body.replace("/", "/\\allowbreak{}")
+            body = body.replace(r"\_", r"\_\allowbreak{}")
             rep = r"\texttt{" + body + "}"
         elif s.startswith("$$"):
             # 段落の途中に置かれた別行立て。`$$ $$` のままだと plain TeX の
@@ -105,8 +114,10 @@ def stage_figure(num, src):
     os.makedirs(FIGDIR, exist_ok=True)
     ext = os.path.splitext(src)[1].lower()
     dst = os.path.join(FIGDIR, f"fig{num.replace('.', '_')}{ext}")
-    if not os.path.exists(dst) or os.path.getmtime(src) > os.path.getmtime(dst):
-        shutil.copyfile(src, dst)
+    # mtime で差分判定すると、図の割り当てを**より古いファイルに差し替えた**とき
+    # コピーが飛ばされて古い画像が残る（2026-10-22 に図2.1〜2.4 で実害）。
+    # 数十点・各 1 MB 未満なので毎回上書きする。
+    shutil.copyfile(src, dst)
     return "figs/" + os.path.basename(dst)
 
 
@@ -124,22 +135,21 @@ def make_bb():
 
 
 def figure_tex(num):
+    """図を1点出力する。キャプションは各章末の「本章の図表」表の内容列。"""
+    cap = inline(CAPTIONS.get(num, ""))
     src = FIGURES.get(num)
     path = os.path.join(ROOT, src) if src else None
+    head = ("\\begin{figure}[htbp]\\centering\n"
+            f"\\renewcommand{{\\thefigure}}{{{num}}}\n")
+    tail = f"\\caption{{{cap}}}\\label{{fig:{num}}}\n\\end{{figure}}"
     if not src or not os.path.exists(path):
         why = MISSING.get(num, "画像が手元に無い（results/ は未追跡）")
-        return ("\\begin{figure}[htbp]\\centering\n"
-                f"\\renewcommand{{\\thefigure}}{{{num}}}\n"
-                "\\fbox{\\parbox[c][28mm][c]{0.8\\linewidth}{\\centering\\small "
-                f"図{num}（未取得）\\\\ {inline(why)}}}}}\n"
-                f"\\caption{{{inline(why)}}}\\label{{fig:{num}}}\n"
-                "\\end{figure}")
+        return (head
+                + "\\fbox{\\parbox[c][28mm][c]{0.8\\linewidth}{\\centering\\small "
+                + f"図{num}（未取得）\\\\ {inline(why)}}}}}\n" + tail)
     rel = stage_figure(num, path)
-    return ("\\begin{figure}[htbp]\\centering\n"
-            f"\\renewcommand{{\\thefigure}}{{{num}}}\n"
-            f"\\includegraphics[width=0.88\\linewidth]{{{rel}}}\n"
-            f"\\caption{{}}\\label{{fig:{num}}}\n"
-            "\\end{figure}")
+    return (head
+            + f"\\includegraphics[width=0.88\\linewidth]{{{rel}}}\n" + tail)
 
 
 # ---------------------------------------------------------------- tables
@@ -148,6 +158,42 @@ def split_row(line, store):
     line = _protect(line, store)
     cells = [c.strip() for c in line.strip().strip("|").split("|")]
     return cells
+
+
+# 本文の幅。jsbook a4paper 11pt の版面を \small で割った目安（半角換算）。
+# これを超える表は、長い列を p{} に変えて折り返させる（はみ出し対策）。
+TABLE_WIDTH = 78
+
+
+def _visual_len(cell, store):
+    """セルの見た目の幅を半角単位で数える（全角は 2）。
+
+    数式とコードは `split_row` が退避済みなので、中身に戻してから数える
+    （戻さないと `\\texttt{...}` が 0 幅に見え、はみ出しを見逃す）。
+    """
+    def back(m):
+        s = store[int(m.group(1))]
+        return s[1:-1] if s.startswith("`") else s
+    cell = re.sub(f"{NUL}(\\d+){NUL}", back, cell)
+    cell = re.sub(r"[*$\\]", "", cell)
+    return sum(2 if ord(ch) > 0x2000 else 1 for ch in cell)
+
+
+def _fit(spec, rows, store):
+    """表が版面に収まらなければ、幅を食っている列を p{} に替える。"""
+    widths = [max(_visual_len(r[i], store) if i < len(r) else 0
+                  for r in rows) for i in range(len(spec))]
+    total = sum(widths) + 2 * len(spec)
+    if total <= TABLE_WIDTH:
+        return spec
+    # 折り返せるのは左寄せの文字列列だけ。数値列（r/c）はそのまま残す
+    wrap = [i for i, a in enumerate(spec) if a == "l" and widths[i] > 10]
+    if not wrap:
+        return spec
+    out = list(spec)
+    for i in wrap:
+        out[i] = "Y"            # tabularx の伸縮列（幅は TeX に計算させる）
+    return out
 
 
 def table_tex(lines, caption, num):
@@ -159,9 +205,13 @@ def table_tex(lines, caption, num):
         spec.append("r" if c.endswith(":") and not c.startswith(":")
                     else "c" if c.startswith(":") and c.endswith(":") else "l")
     body = [split_row(r, store) for r in lines[2:]]
+    spec = _fit(spec, [head] + body, store)
 
     def row(cells):
-        cells = [_restore(inline(_restore(c, store)), []) for c in cells]
+        # 先に _restore すると `code` が \texttt{} に戻り、それを inline() が
+        # もう一度エスケープして \textbackslash{}texttt\{...\} になる。
+        # 退避したままエスケープし、最後に戻す（2026-10-22 修正）。
+        cells = [_restore(inline(c), store) for c in cells]
         return " & ".join(cells) + r" \\"
 
     out = ["\\begin{table}[htbp]\\centering"]
@@ -171,10 +221,13 @@ def table_tex(lines, caption, num):
         out.append(f"\\caption{{{inline(caption)}}}")
     if num:
         out.append(f"\\label{{tab:{num}}}")
-    out += ["\\small", "\\begin{tabular}{" + "".join(spec) + "}", "\\hline",
-            row(head), "\\hline"]
+    env, arg = "tabular", ""
+    if "Y" in spec:                 # 版面に収まらない表は tabularx で折り返す
+        env, arg = "tabularx", "{\\linewidth}"
+    out += ["\\small", f"\\begin{{{env}}}{arg}{{" + "".join(spec) + "}",
+            "\\hline", row(head), "\\hline"]
     out += [row(r) for r in body]
-    out += ["\\hline", "\\end{tabular}", "\\end{table}"]
+    out += ["\\hline", f"\\end{{{env}}}", "\\end{table}"]
     return "\n".join(out)
 
 
@@ -271,14 +324,20 @@ def convert(md, placed):
             continue
 
         cap = CAP_RE.match(s)
-        if cap and i + 1 < len(lines) and lines[i + 1].strip().startswith("|"):
-            i += 1
-            block = []
-            while i < len(lines) and lines[i].strip().startswith("|"):
-                block.append(lines[i])
-                i += 1
-            out.append(table_tex(block, cap.group(2), cap.group(1)))
-            continue
+        if cap:
+            # キャプションと表の間に空行があるのが普通なので読み飛ばす
+            # （飛ばさないと表が無番号・無キャプションのまま出る。2026-10-22 修正）
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines) and lines[j].strip().startswith("|"):
+                i = j
+                block = []
+                while i < len(lines) and lines[i].strip().startswith("|"):
+                    block.append(lines[i])
+                    i += 1
+                out.append(table_tex(block, cap.group(2), cap.group(1)))
+                continue
 
         if re.match(r"^[-*] ", s) or re.match(r"^\d+\. ", s):
             ordered = bool(re.match(r"^\d+\. ", s))
@@ -313,7 +372,8 @@ def convert(md, placed):
             i += 1
         para = "\n".join(buf)
         for num in FIG_RE.findall(para):
-            if num in placed or (num not in FIGURES and num not in MISSING):
+            REFERENCED.add(num)
+            if num in placed or num not in CAPTIONS:
                 continue
             placed.add(num)
             pending.append(num)
@@ -323,11 +383,59 @@ def convert(md, placed):
     return "\n".join(out)
 
 
+# ---------------------------------------------------------------- 参考文献
+
+REFS = os.path.join(HERE, "thesis", "references.md")
+
+
+def references_tex():
+    """`references.md` の一覧を thebibliography に変換する。
+
+    本文の引用は `参考文献 [3]` のような素の番号であり \\cite ではないので、
+    **一覧の並び順が番号と一致していること**を検査してから出力する。
+    """
+    md = open(REFS, encoding="utf-8").read()
+    md = md.split("## 覚え書き")[0]        # 著者用の覚え書きは提出稿に出さない
+    items = re.findall(r"^- \[(\d+)\]\s*(.+)$", md, re.M)
+    nums = [int(n) for n, _ in items]
+    if nums != list(range(1, len(nums) + 1)):
+        raise SystemExit(f"references.md の番号が 1..N の順でない: {nums}")
+    # jsbook の thebibliography が \\chapter*{参考文献} と目次項目を自前で出すので、
+    # ここで見出しを足すと二重になる。
+    out = ["\\begin{thebibliography}{99}"]
+    for n, text in items:
+        t = inline(text.strip())
+        # 欧文の引用符。TeX では " は ” になってしまうので ``...'' に直す
+        t = re.sub(r'"([^"]*)"', "``" + r"\1" + "''", t)
+        out.append(f"\\bibitem{{r{n}}} {t}")
+    out.append("\\end{thebibliography}")
+    return "\n".join(out), nums
+
+
+def check_citations(nums):
+    """本文の `[n]` が一覧に存在するか、一覧の各文献が引用されているかを見る。"""
+    cited = set()
+    for name in CHAPTERS:
+        md = open(os.path.join(HERE, "thesis", name), encoding="utf-8").read()
+        md = re.sub(r"\$\$.+?\$\$", " ", md, flags=re.S)   # 数式中の x[0] 等を除く
+        md = re.sub(r"(?<!\$)\$[^$\n]+?\$", " ", md)
+        cited |= {int(m) for m in re.findall(r"(?<!\w)\[(\d+)\]", md)}
+    out = []
+    for n in sorted(cited - set(nums) - {0}):
+        out.append(f"[{n}] が本文で引用されているが references.md に無い")
+    for n in sorted(set(nums) - cited):
+        out.append(f"[{n}] は references.md にあるが本文から引用されていない")
+    return out
+
+
 # ---------------------------------------------------------------- output
 
 PREAMBLE = r"""% 卒論プリアンブル。研究室指定の書式が出たら、このファイルを差し替える。
 % ビルド: platex thesis.tex（×2）→ dvipdfmx thesis.dvi
 \usepackage{graphicx}
+\usepackage{array,tabularx}
+% 幅の広い表で使う折り返し列（左寄せ・改行可）
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 \usepackage{amsmath,amssymb}
 \usepackage{bm}
 \usepackage{url}
@@ -335,6 +443,8 @@ PREAMBLE = r"""% 卒論プリアンブル。研究室指定の書式が出たら
 \usepackage{pxjahyper}
 \hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
 \renewcommand{\baselinestretch}{1.1}
+% 長い英字パス・URL で行が溢れるのを緩和する（Overfull hbox 対策）
+\setlength{\emergencystretch}{3em}
 \setcounter{tocdepth}{2}
 \setcounter{secnumdepth}{3}
 """
@@ -359,10 +469,32 @@ MAIN = r"""%%%% 卒業論文（本文は docs/thesis/chapter*.md から自動生
 TITLE = "農業用ロボットの経路追従における\\\\スパース最適制御の実機適用"
 
 
+def build_pdf():
+    """platex を2回（相互参照のため）回してから dvipdfmx で PDF にする。"""
+    for cmd in (["platex", "-interaction=nonstopmode", "thesis.tex"],
+                ["platex", "-interaction=nonstopmode", "thesis.tex"],
+                ["dvipdfmx", "-q", "thesis.dvi"]):
+        r = subprocess.run(cmd, cwd=OUTDIR, capture_output=True, text=True)
+        if r.returncode:
+            print(f"{cmd[0]} が失敗した（終了コード {r.returncode}）。"
+                  f"詳細は {os.path.join(OUTDIR, 'thesis.log')}")
+            return 1
+    log = open(os.path.join(OUTDIR, "thesis.log"),
+               encoding="utf-8", errors="replace").read()
+    pages = re.search(r"\((\d+) pages", log)
+    over = log.count("Overfull")
+    print(f"PDF: {os.path.join(OUTDIR, 'thesis.pdf')}"
+          f"（{pages.group(1) if pages else '?'} ページ・"
+          f"Overfull {over} 件）")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true",
                     help="生成後に .toc の節番号が Markdown と一致するか検証")
+    ap.add_argument("--pdf", action="store_true",
+                    help="生成後に platex を2回と dvipdfmx を回して PDF にする")
     args = ap.parse_args()
 
     os.makedirs(OUTDIR, exist_ok=True)
@@ -378,6 +510,11 @@ def main():
         includes.append(f"\\include{{ch{n}}}")
         print(f"ch{n}.tex  {len(tex):>7,} bytes  ← {name}")
 
+    bib, nums = references_tex()
+    open(os.path.join(OUTDIR, "refs.tex"), "w", encoding="utf-8").write(bib + "\n")
+    includes.append("\\include{refs}")
+    print(f"refs.tex  文献 {len(nums)} 件")
+
     open(os.path.join(OUTDIR, "preamble.tex"), "w",
          encoding="utf-8").write(PREAMBLE)
     open(os.path.join(OUTDIR, "thesis.tex"), "w", encoding="utf-8").write(
@@ -387,6 +524,15 @@ def main():
     print(f"\n出力: {OUTDIR}")
     print(f"図 {len(placed)} 点を配置（未取得 {len(MISSING)} 点を含む）")
     print(f".xbb を {make_bb()} 件生成した")
+
+    problems = check_references(REFERENCED) + check_citations(nums)
+    if problems:
+        print("\n登録簿・文献リストと本文の食い違い:")
+        for t in problems:
+            print("  -", t)
+
+    if args.pdf and build_pdf():
+        return 1
 
     if args.check:
         # \include した章の label は ch*.aux 側に出る

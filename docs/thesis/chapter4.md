@@ -722,7 +722,7 @@ Kanayama 法は経路追従則であり、後退を前提としていないた�
 | 表4.1b | $\Sigma|u|$ の並進成分と回転成分 | `2026-07-15_Lturn_3way_real/`（bag 再解析） |
 | 表4.2 | 評価指標の定義としきい値 | `rover/exp_metrics.py` |
 | 表4.3 | 終点計測の 3 者比較 | `2026-07-16_Lturn_1m_smoke2/validation_note.md` |
-| 図4.4 | odom 軌跡とカメラ真値軌跡の重ね描き | `.../traj_odom_vs_truth.png`（取得済み） |
+| 図4.4 | odom 軌跡とカメラ真値軌跡の重ね描き | **取得済み** `results/2026-07-16_Lturn_1m_smoke2/traj_odom_vs_truth.png`（表4.3 と同一走行） |
 | 図4.5 | 計測系の幾何（光線交点） | **取得済み** `results/2026-08-02_thesis_figs2/fig4_5_geometry.png` |
 | 図4.6 | 俯瞰画像上のタグ検出例 | **取得済み** `results/2026-08-02_thesis_figs2/fig4_6_detection.png`（元画像 `docs/tags/*.jpg` は**未追跡**） |
 | 表4.4 | カメラ内部パラメータと運用条件 | `configs/camera_truth.yaml` |

@@ -28,12 +28,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 OUT = os.path.join(HERE, "thesis", "thesis.html")
 
-CHAPTERS = [f"chapter{i}.md" for i in range(1, 9)]
+CHAPTERS = [f"chapter{i}.md" for i in range(1, 9)] + ["references.md"]
 
-from thesis_figures import FIGURES, MISSING  # noqa: E402
+from thesis_figures import (  # noqa: E402
+    CAPTIONS, FIGURES, MISSING, check_references)
 
 
 FIG_RE = re.compile(r"図(\d+\.\d+)")
+# 本文から参照された図番号（登録簿との食い違いを最後に報告する）
+REFERENCED = set()
 
 
 def protect_math(text):
@@ -55,16 +58,18 @@ def restore_math(htm, store):
     return htm
 
 
-def figure_html(num, caption=None):
+def figure_html(num):
+    """図を1点出力する。キャプションは各章末の「本章の図表」表の内容列。"""
+    cap = f'<figcaption>図{num}　{CAPTIONS.get(num, "")}</figcaption>'
     src = FIGURES.get(num)
     if src is None:
         why = MISSING.get(num, "未取得")
         return (f'<figure class="missing"><div class="ph">図{num}'
-                f'<span>{html.escape(why)}</span></div></figure>')
+                f'<span>{html.escape(why)}</span></div>{cap}</figure>')
     rel = os.path.relpath(os.path.join(ROOT, src),
                           os.path.dirname(OUT)).replace(os.sep, "/")
-    cap = f'<figcaption>図{num}</figcaption>' if caption is None else ""
-    return f'<figure><img src="{html.escape(rel)}" alt="図{num}">{cap}</figure>'
+    return (f'<figure><img src="{html.escape(rel)}" alt="図{num}">'
+            f'{cap}</figure>')
 
 
 def insert_figures(md_text, placed):
@@ -79,9 +84,8 @@ def insert_figures(md_text, placed):
         skip = (not stripped or stripped.startswith(("|", ">", "#", "```")))
         if not skip:
             for num in FIG_RE.findall(line):
-                if num in placed:
-                    continue
-                if num not in FIGURES and num not in MISSING:
+                REFERENCED.add(num)
+                if num in placed or num not in CAPTIONS:
                     continue
                 placed.add(num)
                 pending.append(num)
@@ -222,6 +226,11 @@ def main():
     out = build(a.offline)
     size = os.path.getsize(out) / 1024
     print(f"\n出力: {out}（{size:.0f} KB）")
+    problems = check_references(REFERENCED)
+    if problems:
+        print("\n図の登録簿と本文の食い違い:")
+        for t in problems:
+            print("  -", t)
     if a.open:
         import subprocess
         try:  # WSL: Windows 側の既定ブラウザで開く
