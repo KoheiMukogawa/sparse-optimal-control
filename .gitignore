@@ -46,3 +46,6 @@ docs/abstract/*.dvi
 docs/abstract/*.bbl
 docs/abstract/*.blg
 docs/abstract/*.out
+
+# 提出した成果物のPDFは例外として追跡する（上の *.pdf より後に書くこと）
+!docs/提出物/*.pdf
