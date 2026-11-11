@@ -7,7 +7,10 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 
 ## 環境
 
-- 開発環境: Surface Laptop Go, WSL2 Ubuntu 24.04, ROS2 Jazzy（メモリ少なめ）
+- 開発環境: 自作機（AMD Ryzen 5 5500・6C/12T）, WSL2 Ubuntu 22.04.5, ROS2 Humble
+  （WSL に 15 GiB・swap 4 GiB、ディスク空き 944 GB。**メモリは潤沢**。2026-11-11 実測）
+  - **罠**: `C:\Users\<Windowsユーザ名>\.wslconfig` に `memory=3GB` が残っている。
+    現在は効いていないが、`wsl --shutdown` すると 3 GB に絞られる
 - 実機: LiteRover（ヴィストン, RPi4, Ubuntu 22.04, ROS2 Humble）
 - DDS設定: ~/scripts/cyclonedds_laptop.xml（ユニキャスト、ラップトップ192.168.0.9↔RPi192.168.0.31）
 - RPi接続:
