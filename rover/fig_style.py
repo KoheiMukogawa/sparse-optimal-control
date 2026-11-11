@@ -5,6 +5,9 @@
 フォント設定をここ1か所に置く。日本語↔英語ラベルの切り替えもここだけで済む。
 """
 
+import os
+import re
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -119,6 +122,50 @@ def setup():
         "grid.alpha": 0.3,
         "axes.axisbelow": True,
     })
+
+
+# 画像の中に焼き込んだ「図N.N …」を外すための仕掛け。
+# 本文（LaTeX）もスライドも図の外にキャプションを置くので、
+# 画像にも題が入っていると二重になる。
+# 小見出し（"(a) 拡大" や "ノルム球が制約に当たる場所"）は題ではないので残す。
+# 題の2行目以降（補足の1文）も残す。
+# 下書きを通し読みするときだけ FIG_KEEP_TITLE=1 を立てれば従来どおり題が入る。
+CAPTION_RE = re.compile(r"^\s*図\s*\d+\.\d+")
+
+
+def _strip_caption(text):
+    lines = (text or "").split("\n")
+    if lines and CAPTION_RE.match(lines[0]):
+        return "\n".join(lines[1:]).strip()
+    return text
+
+
+def drop_caption_titles(fig):
+    """図に焼き込まれたキャプション行を落とす。"""
+    if os.environ.get("FIG_KEEP_TITLE"):
+        return fig
+    sup = getattr(fig, "_suptitle", None)
+    if sup is not None:
+        rest = _strip_caption(sup.get_text())
+        if rest != sup.get_text():
+            sup.set_text(rest)
+            sup.set_visible(bool(rest))
+    for ax in fig.axes:
+        # 題は loc ごとに別物として保持される（loc="left" は get_title() に出ない）
+        for loc in ("center", "left", "right"):
+            cur = ax.get_title(loc=loc)
+            rest = _strip_caption(cur)
+            if rest != cur:
+                ax.set_title(rest, loc=loc)
+    return fig
+
+
+def save(fig, path, **kw):
+    """キャプション行を外してから保存する。保存後に figure は閉じる。"""
+    drop_caption_titles(fig)
+    fig.savefig(path, **kw)
+    plt.close(fig)
+    return path
 
 
 def style(cond):

@@ -56,8 +56,7 @@ def representative(agg, cond, rep=1):
 
 def _save(fig, outdir, name):
     path = os.path.join(outdir, name)
-    fig.savefig(path)
-    plt.close(fig)
+    FS.save(fig, path)
     print(f"  {name}")
     return path
 

@@ -45,6 +45,30 @@
 > **未確認**: この環境には LibreOffice も poppler も無く、**描画しての目視はできていない**
 > （10/15 から変わらず）。restyled 版は Windows の PowerPoint で開いて確認すること。
 
+### uv を復旧し、図の二重タイトルを解消した（2026-11-11）
+
+**環境の記述が4点とも間違っていた**ので CLAUDE.md を実測値に直した。
+実機は Ryzen 5 5500・6C/12T、WSL に **15 GiB**、ディスク空き 944 GB、
+Ubuntu 22.04.5、ROS2 Humble。「メモリ少なめ」ではない。
+ただし `C:\Users\<Windowsユーザ名>\.wslconfig` に `memory=3GB` が残っていて、
+**`wsl --shutdown` すると 3 GB に絞られる**（今は効いていない）。
+
+- `uv 0.13.7` を入れて `uv sync` → `.venv` 復元。cvxpy 1.8.2 / matplotlib 3.10.8 /
+  japanize_matplotlib / mistune すべて可。**`uv run pytest tests/` → 172 passed**
+- `rover/fig_style.py` に **`drop_caption_titles()` と `save()`** を追加した。
+  画像に焼き込んだ「図N.N …」の**1行目だけ**を落とし、2行目の補足は残す。
+  小見出し（`(a) …` など）は題ではないので触らない。`FIG_KEEP_TITLE=1` で従来どおり
+  - **注意**: 題は `loc`（center/left/right）ごとに別物として保持される。
+    `ax.get_title()` は center しか返さないので、3つとも見る必要がある（ここで一度踏んだ）
+- `make_thesis_figs.py` と `make_thesis_figs2.py` の保存口を `FS.save()` に通し、
+  **31 点を再生成**。全点で画像の高さが題のぶん（23〜86 px）縮んだ
+- 検証: 卒論 PDF を再ビルド → **109 ページ・Overfull 0**。p.14（図2.1）を描画して、
+  画像内の題が消えて LaTeX のキャプションだけになっていることを目視確認した
+
+**残り**: 英語ラベルのままの4点（図5.2 tradeoff・図5.4 delay_sweep・図5.5 sweep_ms・
+図6.7 disturb）。生成元は `rover/sweep_*.py` だが **再実行すると sim をやり直して
+CSV を上書きする**ので、**既存 CSV から描き直す `--replot` を足してから**日本語化すること。
+
 ### 卒論発表スライドを方針どおりに新規生成した —— `docs/make_thesis_slides.py`
 
 方針書に沿って**ゼロから組み直したドラフト 17 枚**を生成した。

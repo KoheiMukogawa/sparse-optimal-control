@@ -91,8 +91,7 @@ def blank(figsize=(9, 5)):
 
 def save(fig, name):
     path = os.path.join(OUT, name)
-    fig.savefig(path)
-    plt.close(fig)
+    FS.save(fig, path)
     print(f"  {name}")
 
 
