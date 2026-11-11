@@ -52,3 +52,6 @@ docs/abstract/*.out
 
 # 卒論の LaTeX 出力（docs/build_thesis_tex.py で再生成できる）
 docs/thesis/tex/
+
+# restyle_pptx.py の出力（元デッキから機械的に再生成できる）
+docs/*_restyled.pptx
