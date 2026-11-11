@@ -33,22 +33,23 @@ import sys
 import zipfile
 from collections import Counter
 
-# 和文フォントで組まれている欧文を、この欧文フォントへ移す
-LATIN = "Segoe UI"
-# 等幅が要るので置き換えない和文フォント（コードブロック）
-KEEP = {"MS Gothic", "MS Mincho", "Consolas"}
+# 和文・欧文ともこの1本にする（2026-08 の院試デッキと同じ。欧文も専用設計があるので
+# 「欧文に和文フォントを使わない」原則に触れない）。docs/スライドデザイン方針.md 参照。
+LATIN = "BIZ UDPGothic"
+# 置き換えないフォント: コードの等幅（日本語コメントと ASCII の桁合わせ）と数式
+KEEP = {"MS Gothic", "MS Mincho", "Consolas", "Courier New", "Cambria Math"}
 
 # 近似重複色の統合（残す色 ← 潰す色）。見た目はほぼ変わらない。
+# 行き先は院試デッキ（2026-08-16）から抜いた無彩色＋朱1色のパレット。
 MERGE = {
-    "23292F": ["222A30", "202A33"],                    # 墨3種 → 文字の基本色1つ
-    "4F5A63": ["53606A"],                              # 灰2種 → 補助色1つ
-    "F6F8F9": ["F4F7F8", "F4F6F8", "EEF3F5", "EEF4F6"],  # オフ白5種 → 箱の下地1つ
-    "E4EFF3": ["E3F0F5"],                              # 淡青2種
-    "2E7A60": ["2E8B57"],                              # 緑2種
-    "C0433B": ["B14A2E"],                              # 赤系の強調2種
+    "2D2D2D": ["23292F", "222A30", "202A33"],                   # 本文
+    "1A1A1A": ["124659"],                                       # 見出し
+    "757575": ["4F5A63", "53606A", "6B7680", "8A959E", "1F6F8B"],  # 注記・ラベル・罫線
+    "C4C4C4": ["DCE2E6"],                                       # 細い罫線
+    "F4F4F4": ["F6F8F9", "F4F7F8", "F4F6F8", "EEF3F5", "EEF4F6",
+               "E4EFF3", "E3F0F5"],                             # 下地
+    "B1390A": ["E07A3F", "C0433B", "B14A2E", "2E7A60", "2E8B57"],  # 強調（唯一の有彩色）
 }
-# 灰のランプ（#6B7680 / #8A959E / #DCE2E6）は段階として使い分けているので残す。
-# 無彩色は色数に数えない（出典 図10b「灰色で色数を抑える」）。
 COLOR_MAP = {old: new for new, olds in MERGE.items() for old in olds}
 
 PARTS = re.compile(r"ppt/(slides|slideLayouts|slideMasters|notesSlides)/[^/]+\.xml$")
@@ -58,14 +59,14 @@ def restyle_xml(xml):
     """1つのパートを直し、(直した XML, 変更件数の内訳) を返す。"""
     n_font = n_color = 0
 
-    def latin(m):
+    def font(m):
         nonlocal n_font
-        if m.group(1) in KEEP or m.group(1) == LATIN:
+        if m.group(2) in KEEP or m.group(2) == LATIN:
             return m.group(0)
         n_font += 1
-        return f'<a:latin typeface="{LATIN}"'
+        return f'<a:{m.group(1)} typeface="{LATIN}"'
 
-    xml = re.sub(r'<a:latin typeface="([^"]*)"', latin, xml)
+    xml = re.sub(r'<a:(latin|ea|cs) typeface="([^"]*)"', font, xml)
 
     def color(m):
         nonlocal n_color
@@ -84,7 +85,7 @@ def restyle_theme(xml):
     def fix(m):
         s = m.group(0)
         s = re.sub(r'<a:latin typeface="[^"]*"', f'<a:latin typeface="{LATIN}"', s)
-        s = re.sub(r'<a:ea typeface="[^"]*"', '<a:ea typeface="Meiryo"', s)
+        s = re.sub(r'<a:ea typeface="[^"]*"', f'<a:ea typeface="{LATIN}"', s)
         return s
     return re.sub(r"<a:(major|minor)Font>.*?</a:\1Font>", fix, xml, flags=re.S)
 
@@ -98,8 +99,9 @@ def restyle_theme(xml):
 
 EMU = 914400
 LIGHT = {"F6F8F9", "F4F7F8", "F4F6F8", "EEF3F5", "EEF4F6", "E4EFF3", "E3F0F5"}
-INK = "23292F"          # 文字の基本色
-RULE = "4F5A63"         # 罫線（補助色）
+INK = "2D2D2D"          # 文字の基本色
+RULE = "C4C4C4"         # 罫線
+MUTED = "757575"        # 注記・ラベル
 RULE_H = 9525           # 0.75 pt
 HEAD_W = int(11.5 * EMU)  # 見出しと同じ幅の罫線
 SP_RE = re.compile(r"<p:sp>.*?</p:sp>", re.S)
@@ -107,15 +109,14 @@ SP_RE = re.compile(r"<p:sp>.*?</p:sp>", re.S)
 # 文字色の置き換え。白地に載せ替える分と、**有彩色を図の配色（Okabe-Ito）に
 # 揃える**分。構造を指していた色（見出しの上付きラベル等）は無彩色に落とし、
 # 強調だけ色を残す。残す2色は図の「素L1＝朱」「対策後＝緑」と同じ意味で使う。
+# 色面を外したあとの文字色。MERGE を通したあとの値で書く。
 TEXT_MAP = {
-    "FFFFFF": INK,       # 色面の上の白文字 → 墨（色面を外したため）
-    "E3F0F5": RULE,      # 章扉の淡い副題 → 補助色
-    "1F6F8B": RULE,      # 見出しの上付きラベル等の構造色 → 無彩色
-    "124659": INK,
-    "E07A3F": "D55E00",  # 強調（橙） → 図の朱（＝素のL1・問題）
-    "C0433B": "D55E00",
-    "2E7A60": "009E73",  # 強調（緑） → 図の緑（＝対策後）
+    "FFFFFF": INK,       # 色面の上に載っていた白文字 → 本文色
+    "F4F4F4": MUTED,     # 下地色で書かれていた副題 → 注記色
+    "C4C4C4": MUTED,
 }
+# 箇条書きの記号。`●` は配布資料の記号で、研究発表では `・` を使う。
+BULLETS = {"●  ": "・", "● ": "・", "●": "・", "–  ": "・"}
 
 
 def _spparts(sp):
@@ -153,11 +154,11 @@ def de_decorate(xml):
 
     # 表はデータなので構造は触らないが、見出し行の塗りだけ無彩色にする。
     # 有彩色をデータ（図の系列）だけに残すため。白文字はそのままで読める。
-    hdr = f'<a:solidFill><a:srgbClr val="1F6F8B"/></a:solidFill></a:tcPr>'
-    n["表の見出しを無彩色に"] = xml.count(hdr)
-    xml = xml.replace(hdr, hdr.replace("1F6F8B", RULE))
-    if not n["表の見出しを無彩色に"]:
-        del n["表の見出しを無彩色に"]
+    for old_b, new_b in BULLETS.items():      # ● → ・
+        k = xml.count(f"<a:t>{old_b}")
+        if k:
+            n["箇条書きの記号"] += k
+            xml = xml.replace(f"<a:t>{old_b}", f"<a:t>{new_b}")
 
     def one(m):
         sp = m.group(0)
@@ -293,8 +294,9 @@ def main():
     for k, v in plain.most_common():
         print(f"脱装飾 {k}: {v} 箇所")
     print(f"出力: {out}（{os.path.getsize(out)/1024:.0f} KB）")
-    print("\n残りは手作業: 文字を削る / ページ番号を消す / 余白を揃える"
-          "（docs/スライドデザイン方針.md の適用手順 3〜6）")
+    print("\n残りは手作業: 見出しを言い切りの文にする / ダッシュ・英語ラベルを外す /"
+          " 文字を削る / 密度に差をつける / ページ番号をフィールドで入れ直す"
+          "（docs/スライドデザイン方針.md の §4）")
 
 
 if __name__ == "__main__":
