@@ -43,6 +43,8 @@ MPC（モデル予測制御）の評価関数に、入力偏差 δu の **L1 正
 
 以下は clean clone から実際に実行して動作を確認済み（`uv sync` → `uv run pytest -q` で **82 passed / 20 skipped**、skip は全て `results/` に依存するテスト）。
 
+2台目のPCでの立ち上げ手順は `docs/環境構築.md` にまとめている。
+
 ```bash
 uv sync                                                 # 依存をインストール
 uv run pytest -q                                        # 82 passed / 20 skipped
@@ -66,6 +68,8 @@ LiteRover（Raspberry Pi 4, ROS2 Humble）を使った実機評価は実施済�
 | `docs/` | 研究計画・引き継ぎ・作業記録 |
 | `docs/handoff.md` | 現在地・次・懸念（セッション毎更新） |
 | `docs/research_plan.md` | 研究計画（P1〜P7） |
+| `docs/環境構築.md` | 2台のPCで同じ環境を作る手順 |
+| `scripts/` | 実機接続・リポジトリ同期のスクリプト |
 | `tests/` | pytest（`uv run pytest -q` で実行） |
 | `CLAUDE.md` | リポジトリ規約＋現在地サマリ |
 

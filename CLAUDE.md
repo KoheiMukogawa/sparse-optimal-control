@@ -7,17 +7,50 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 
 ## 環境
 
-- 開発環境: 自作機（AMD Ryzen 5 5500・6C/12T）, WSL2 Ubuntu 22.04.5, ROS2 Humble
-  （WSL に 15 GiB・swap 4 GiB、ディスク空き 944 GB。**メモリは潤沢**。2026-11-11 実測）
-  - **罠**: `C:\Users\<Windowsユーザ名>\.wslconfig` に `memory=3GB` が残っている。
-    現在は効いていないが、`wsl --shutdown` すると 3 GB に絞られる
+**2台のPCで作業する（自作機とMacBook）。マシン固有の事情は下表にだけ書き、
+他の場所に散らさない。** セットアップ手順は `docs/環境構築.md`。
+
+| | 自作機（主にこちら） | MacBook |
+|---|---|---|
+| OS | WSL2 Ubuntu 22.04.5 / ROS2 Humble | macOS（ROS2 なし） |
+| CPU/メモリ | Ryzen 5 5500・6C/12T, WSL に 15 GiB・swap 4 GiB、空き 944 GB（2026-11-11 実測。**メモリは潤沢**） | （未記録） |
+| ホスト名 | `kohei-desktop` | （未記録） |
+| 固有の罠 | `C:\Users\<Windowsユーザ名>\.wslconfig` に `memory=3GB` が残る。今は効いていないが `wsl --shutdown` で 3 GB に絞られる | 日本語ファイル名の Unicode 正規化。`git config core.precomposeunicode true` を確認する |
+
+- **手元のPCに ROS2 は要らない**（2026-07-17 確認・`docs/handoff.md` の「laptop↔RPi の DDS は
+  元々不要」）。走行制御は RPi 内で完結し、手元からは **SSH と素の UDP** しか使わない。
+  `rclpy` を import するのは RPi 側で動くノードだけ（`mpc_follower.py` `udp_twist_bridge.py` 等）
 - 実機: LiteRover（ヴィストン, RPi4, Ubuntu 22.04, ROS2 Humble）
-- DDS設定: ~/scripts/cyclonedds_laptop.xml（ユニキャスト、ラップトップ192.168.0.9↔RPi192.168.0.31）
-- RPi接続:
-  - 家Wi-Fi: `ssh mukougawakouhei@192.168.0.32`（2026-07-15にDHCPで.31→.32へ変動。
-    恒久対策はルーターでMAC固定割当。繋がらない時はポート22走査で現IPを探す）
-  - RPiホットスポット: `ssh mukougawakouhei@192.168.4.1`
-  - どちらか繋がらない場合はもう一方を試す
+- **接続先は `scripts/hosts.env` に書く**（`scripts/hosts.env.example` からコピー・**追跡しない**。
+  大学側がグローバルIPで本体リポジトリが public のため）。`rover/exp_backends.py` は
+  環境変数 `SSH_HOSTS` を直接読む
+- RPi接続: `scripts/connect_rpi.sh`（家Wi-Fi→RPiホットスポットを順に試す）／
+  大学経由は `scripts/connect_rpi.sh univ`。家Wi-Fi は DHCP で変動する（2026-07-15 に .31→.32）。
+  恒久対策はルーターでMAC固定割当。繋がらない時はポート22走査で現IPを探す
+- DDS設定 `scripts/cyclonedds.xml` は **RPi 側で ROS2 を立てるとき用**。手元では使わない
+
+## リポジトリ構成（2つある）
+
+| | 置き場所 | 中身 |
+|---|---|---|
+| 本体 | `KoheiMukogawa/sparse-optimal-control`（**public**） | コード・configs・docs |
+| 実験データ | `KoheiMukogawa/sparse-optimal-control-results`（**private**） | `results/` の中身。本体では `.gitignore` 対象 |
+
+`results/` は**本体の作業ツリー内に clone した別リポジトリ**。未発表の実機データと
+他者著作物を public に置けないための構成。**両方 pull / 両方 push が必要**。
+
+```sh
+scripts/sync.sh status          # 2つの差分と ahead/behind をまとめて見る
+scripts/sync.sh pull            # 2つを pull
+scripts/sync.sh push "メッセージ" # results の未コミットを commit し、2つを push
+```
+
+- **GitHub 認証は HTTPS + `gh`** に統一する（`gh auth login` → `gh auth setup-git`）。
+  SSH 鍵を各PCで管理すると片方だけ push できない状態に陥る
+  （2026-11-12 に実際に発生。ラップトップの鍵をコピーしただけで未登録だった）
+- 同期しないもの: `data/paper/`（他者の論文PDF。書誌は `docs/thesis/references.md` に
+  あるので各自入手）、`.venv/`（`uv sync --frozen` で作る）、`docs/abstract/` の
+  学会配布書式（private 側 `results/_abstract_style/` に退避してある）
 
 ## ブランチ運用
 
@@ -32,6 +65,10 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 ## セッション終了時
 
 - `docs/handoff.md` を更新（現在の状況・次にやること・懸念事項）
+- **`scripts/sync.sh push "…"` で2つのリポジトリを両方 push する。**
+  片方だけ push すると、もう1台のPCで図やデータが古いまま作業することになる
+  （2026-11-12 に発覚: results 側が約2ヶ月・本体側が15コミット未 push で両PCが分岐していた）
+- 作業開始時は `scripts/sync.sh pull`（別のPCで進めた分を先に取り込む）
 
 ## コミットメッセージ
 

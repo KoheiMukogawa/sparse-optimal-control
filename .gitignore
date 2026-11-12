@@ -57,3 +57,6 @@ docs/thesis/tex/
 docs/*_restyled.pptx
 docs/*_plain.pptx
 docs/卒論発表*.pptx
+
+# 実機の接続先（大学側はグローバルIP）。.example だけを追跡する
+scripts/hosts.env

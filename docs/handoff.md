@@ -1,7 +1,56 @@
-# Handoff - 2026-11-11
+# Handoff - 2026-11-12
 
 過去セッション（2026-06-12〜2026-07-15）の全文は
 `docs/作業記録/handoff_archive.md` に退避（必要時のみ参照）。
+
+## 2026-11-12 セッション（2台のPCの分岐を解消し、属PC化を仕組みで止めた・実機なし）
+
+MacBook でも研究を進めているので、PC別に環境が分かれないよう Git 管理を整えた。
+**調べたら既に分岐していた。**
+
+### 見つかった事実（これが本題）
+
+| 事実 | 影響 |
+|---|---|
+| **このデスクトップの SSH 鍵が GitHub に未登録**（ラベルが `mukougawakouhei@laptop`＝ラップトップからのコピー） | `git push` が一度も通っていなかった |
+| `branch.main` に upstream 未設定 | 引数なしの `git pull` / `git push` も失敗する |
+| 本体リポジトリが **ローカル15コミット先行・リモート1コミット先行＝分岐** | 10/15 以降の作業（概要提出・LaTeX化・スライド方針・図再生成）が GitHub に無かった |
+| `results/`（private）の最終 push が **2026-09-17** | 11/11 に再生成した図31点がこのPCにしか無かった |
+| もう1台が 10/22 に push した `docs/次回研究発表会への回答事項.md` がこのPCに無かった | 指導教員の指摘への回答準備が片方にしか無かった |
+
+### やったこと
+
+- **origin を HTTPS に切り替え、`gh auth setup-git` で認証を `gh` に統一。**
+  SSH 鍵を各PCで管理するのをやめる（片方だけ push できない状態の再発防止）
+- `origin/main`（= 2台目の1コミット）に **ローカル15コミットを rebase**。
+  触ったファイルの重なりがゼロだったため**衝突なし**。`uv run pytest tests/` → **172 passed**
+- upstream を `origin/main` に設定
+- `results/`（private）に図31点をコミットして push 済み（`9782641`）
+- **`~/scripts/` をリポジトリの `scripts/` に移した**（そのPCにしか無いファイルを無くす）。
+  `connect_rpi.sh` は接続先を `scripts/hosts.env`（**追跡しない**・大学側はグローバルIP）から
+  読む形に。`obsidian_charts.py` は `/mnt/c/Users/...` 固定をやめ `OBSIDIAN_CHART_DIR` で外出し
+- **`scripts/sync.sh`** を追加（`status` / `pull` / `push "msg"` で**2つのリポジトリをまとめて**扱う）
+- **`docs/環境構築.md`** を新規作成（新PCでの手順・macOS 固有の注意・属PC化チェック）
+- `CLAUDE.md` の「環境」をマシン別の表に書き換え、「リポジトリ構成（2つある）」節を追加。
+  セッション終了時の手順に `scripts/sync.sh push` を追加
+- 概要の学会配布書式（`.cls`/`.sty`）を private 側 `results/_abstract_style/` に退避。
+  先輩のサンプルは**どちらにも置かない**（他の学生の氏名・学籍番号を含むため）
+
+### 確定した事実（Mac 側の環境について）
+
+- **手元のPCに ROS2 は要らない。** 走行制御は RPi 内で完結し、手元からは SSH と素の UDP のみ
+  （7-17 の「laptop↔RPi の DDS は元々不要」の確認が効いている）。`rclpy` を import するのは
+  RPi 側ノードだけ。bag 解析の `rosbags` は pure Python。**Mac で実機バッチ・解析・執筆が全部できる**
+- `uv.lock` は macOS の wheel を含む universal lock（cvxpy / clarabel / opencv を確認）。
+  `uv sync --frozen` がそのまま通る
+- Mac 側の注意: 日本語ファイル名の NFD 正規化（`core.precomposeunicode`）、
+  大文字小文字を区別しないFS、platex は `mactex-no-gui`
+
+### 次にやること
+
+- **Mac 側で `docs/環境構築.md` の手順を実際に通す**（この文書は自作機からしか検証していない）。
+  通ったら Mac のホスト名・リポジトリ位置を `CLAUDE.md` の表に書き足す
+- 4代目 RPi4 の調達待ち（SDカードは健全）
 
 ## 2026-11-11 セッション（発表スライドのデザイン方針を定めた・実機なし）
 
