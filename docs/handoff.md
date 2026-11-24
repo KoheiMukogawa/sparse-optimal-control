@@ -1,7 +1,54 @@
-# Handoff - 2026-11-12
+# Handoff - 2026-11-25
 
 過去セッション（2026-06-12〜2026-07-15）の全文は
 `docs/作業記録/handoff_archive.md` に退避（必要時のみ参照）。
+
+## 2026-11-25 セッション（MacBook の環境構築を実際に通し、Codex でも使えるようにした・実機なし）
+
+11-12 の「次にやること」の1つ目（**Mac 側で `docs/環境構築.md` の手順を実際に通す**）を消化し、
+あわせてコーディングエージェントを Claude Code / Codex のどちらでも使える形にした。
+
+### MacBook の環境構築（§2 の手順をそのまま実行）
+
+| やったこと | 結果 |
+|---|---|
+| `brew install uv` | uv 0.13.9（`gh` 2.102.0 / git 2.54.0 は既存、**ROS2 は入れていない**） |
+| `results`（private）を本体の中へ clone | 54MB・HTTPS + `gh` の認証がそのまま通った |
+| `uv sync --frozen` | そのまま成功（universal lock の確認が効いている） |
+| `uv run pytest tests/` | **172 passed**（`results/` 込みの期待値どおり・31秒） |
+| `uv run python rover/test_mpc_sim.py --reg l1 --lam 0.3` | 全5ケース到達・求解p95 1.1〜3.3ms |
+
+→ **`docs/環境構築.md` は2台とも実測済みの文書になった**（§2.4 に追記）。
+`CLAUDE.md` の環境表の MacBook 列を実測値で埋めた（`ollo-kohei`・Apple M5 10コア・16 GiB・
+macOS 27.2.1・リポジトリ位置は自作機と同じ `~/projects/sparse-optimal-control`）。
+
+- **Mac に LaTeX（platex）は入れていない。** 概要・卒論のPDFビルドは自作機で行う。
+  Mac で必要になったら `brew install --cask mactex-no-gui`（§4）
+- `core.precomposeunicode` は `true`（Mac 既定）。日本語パスの NFD 問題は出ていない
+
+### Codex でも使えるようにした
+
+- **`AGENTS.md` を `CLAUDE.md` へのシンボリックリンクにした**（`ln -s CLAUDE.md AGENTS.md`）。
+  Codex は `AGENTS.md`、Claude Code は `CLAUDE.md` を読むが、**中身は1つ**。
+  規約を2箇所に書くと片方だけ更新されて食い違うため（マシン固有の事情を表1箇所に
+  まとめているのと同じ理由）。**規約を直すときは `CLAUDE.md` を直す**
+- `CLAUDE.md` に「エージェント（Claude Code / Codex のどちらでも使う）」節、
+  `docs/環境構築.md` に「§8 コーディングエージェント」を追加
+- **`~/.codex/config.toml` に本リポジトリの `trust_level = "trusted"` を意図的に書かない。**
+  承認プロンプトが出る状態を保つ（実機を動かすコマンドは毎回許可を得る運用と、
+  trusted による無承認実行が正面衝突するため）
+- 動作確認: `codex exec --sandbox read-only` で AGENTS.md の中身を質問したところ、
+  `uv run pytest tests/` と「実機は毎回許可・有人監視」を正しく答えた（＝リンク越しに読めている）
+- **Codex の既定サンドボックスはネットワーク遮断**なので `uv sync` / `git push` /
+  `gh` / 実機SSH は素通りしない（承認して実行する）。sim・bag解析・図生成・執筆は
+  サンドボックス内で完結する
+
+### 次にやること
+
+- 4代目 RPi4 の調達待ち（SDカードは健全）。来たら `spin_test` で `ROVER_D` を再較正する
+  （`0.1514` は初代・2代目の実測値で**車体固有**）
+- 卒論（12/24 ごろ研究室提出）の執筆。図とデータは `results/` 側にあるので
+  作業開始時 `scripts/sync.sh pull` / 終了時 `scripts/sync.sh push` を守る
 
 ## 2026-11-12 セッション（2台のPCの分岐を解消し、属PC化を仕組みで止めた・実機なし）
 

@@ -12,10 +12,11 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 
 | | 自作機（主にこちら） | MacBook |
 |---|---|---|
-| OS | WSL2 Ubuntu 22.04.5 / ROS2 Humble | macOS（ROS2 なし） |
-| CPU/メモリ | Ryzen 5 5500・6C/12T, WSL に 15 GiB・swap 4 GiB、空き 944 GB（2026-11-11 実測。**メモリは潤沢**） | （未記録） |
-| ホスト名 | `kohei-desktop` | （未記録） |
-| 固有の罠 | `C:\Users\<Windowsユーザ名>\.wslconfig` に `memory=3GB` が残る。今は効いていないが `wsl --shutdown` で 3 GB に絞られる | 日本語ファイル名の Unicode 正規化。`git config core.precomposeunicode true` を確認する |
+| OS | WSL2 Ubuntu 22.04.5 / ROS2 Humble | macOS 27.2.1（ROS2 なし） |
+| CPU/メモリ | Ryzen 5 5500・6C/12T, WSL に 15 GiB・swap 4 GiB、空き 944 GB（2026-11-11 実測。**メモリは潤沢**） | Apple M5・10コア（P4/E6）・16 GiB、空き 226 GB（2026-11-25 実測） |
+| ホスト名 | `kohei-desktop` | `ollo-kohei` |
+| リポジトリ位置 | `~/projects/sparse-optimal-control` | `~/projects/sparse-optimal-control`（同じ） |
+| 固有の罠 | `C:\Users\<Windowsユーザ名>\.wslconfig` に `memory=3GB` が残る。今は効いていないが `wsl --shutdown` で 3 GB に絞られる | 日本語ファイル名の Unicode 正規化。`git config core.precomposeunicode true` を確認する（確認済み）。LaTeX（platex）は未インストール＝概要・卒論のPDFビルドは自作機で行う |
 
 - **手元のPCに ROS2 は要らない**（2026-07-17 確認・`docs/handoff.md` の「laptop↔RPi の DDS は
   元々不要」）。走行制御は RPi 内で完結し、手元からは **SSH と素の UDP** しか使わない。
@@ -28,6 +29,21 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
   大学経由は `scripts/connect_rpi.sh univ`。家Wi-Fi は DHCP で変動する（2026-07-15 に .31→.32）。
   恒久対策はルーターでMAC固定割当。繋がらない時はポート22走査で現IPを探す
 - DDS設定 `scripts/cyclonedds.xml` は **RPi 側で ROS2 を立てるとき用**。手元では使わない
+
+## エージェント（Claude Code / Codex のどちらでも使う）
+
+**規約ファイルはこの `CLAUDE.md` 1本。** `AGENTS.md` は本ファイルへの
+**シンボリックリンク**（`ln -s CLAUDE.md AGENTS.md`）で、Codex は `AGENTS.md`、
+Claude Code は `CLAUDE.md` を読む。**同じ規約を2箇所に書かないこと**
+（片方だけ更新されて食い違う事故を防ぐ。マシン固有の事情を上表にだけ書くのと同じ理由）。
+
+- Codex は `cd ~/projects/sparse-optimal-control && codex` で起動する
+- **`~/.codex/config.toml` に本リポジトリの `trust_level = "trusted"` を書かない。**
+  承認プロンプトが出る状態を保つ（実機を動かすコマンドは毎回許可を得る運用。
+  → 「運用ルール（恒久）」）
+- Codex の既定サンドボックスは**ネットワーク遮断**。`uv sync` / `git push` / `gh` /
+  実機への SSH は素通りしないので、承認して実行するか自分でターミナルから叩く
+- どのエージェントでも、環境は `docs/環境構築.md`、現在地は `docs/handoff.md` から読む
 
 ## リポジトリ構成（2つある）
 
