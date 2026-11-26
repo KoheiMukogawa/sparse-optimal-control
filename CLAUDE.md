@@ -16,7 +16,7 @@ MPC + L1正則化、評価指標はRMSE・消費エネルギー・入力スパ�
 | CPU/メモリ | Ryzen 5 5500・6C/12T, WSL に 15 GiB・swap 4 GiB、空き 944 GB（2026-11-11 実測。**メモリは潤沢**） | Apple M5・10コア（P4/E6）・16 GiB、空き 226 GB（2026-11-25 実測） |
 | ホスト名 | `kohei-desktop` | `ollo-kohei` |
 | リポジトリ位置 | `~/projects/sparse-optimal-control` | `~/projects/sparse-optimal-control`（同じ） |
-| 固有の罠 | `C:\Users\<Windowsユーザ名>\.wslconfig` に `memory=3GB` が残る。今は効いていないが `wsl --shutdown` で 3 GB に絞られる | 日本語ファイル名の Unicode 正規化。`git config core.precomposeunicode true` を確認する（確認済み）。LaTeX（platex）は未インストール＝概要・卒論のPDFビルドは自作機で行う |
+| 固有の罠 | `C:\Users\<Windowsユーザ名>\.wslconfig` に `memory=3GB` が残る。今は効いていないが `wsl --shutdown` で 3 GB に絞られる | 日本語ファイル名の Unicode 正規化。`git config core.precomposeunicode true` を確認する（確認済み）。LaTeX は MacTeX 2026.0324 を 2026-11-26 に導入済み（**brew 管理外**。pkg を直接インストール。卒論PDFビルドを実測確認）＝概要・卒論のPDFビルドは**2台とも可能** |
 
 - **手元のPCに ROS2 は要らない**（2026-07-17 確認・`docs/handoff.md` の「laptop↔RPi の DDS は
   元々不要」）。走行制御は RPi 内で完結し、手元からは **SSH と素の UDP** しか使わない。
