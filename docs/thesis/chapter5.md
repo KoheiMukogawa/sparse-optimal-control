@@ -720,7 +720,7 @@ $w_{ms} = 0.5$ が選ばれるが、これは遅延 4 ステップで破綻す�
 | 表5.7 | チャタリング診断指標 | `2026-06-13_Lturn_compare.md` B 節 |
 | 表5.7b | 入力遅延の内訳（実測） | `results/2026-09-14_delay_odom/notes.md` |
 | 表5.8 | 遅延スイープ（0〜4 step） | `results/2026-07-26_delay_sweep/table.md` |
-| 図5.4 | 遅延に対する各指標の推移 | **取得済み** `.../delay_sweep.png`（日本語化済み） |
+| 図5.4 | 遅延に対する各指標の推移 | **取得済み** `results/2026-07-26_delay_sweep/delay_sweep.png`（日本語化済み） |
 | 表5.9 | 移動抑制スイープ（遅延 2 step） | `results/2026-07-26_lambda_ms_grid/` |
 | 表5.9b | 遅延マージンの比較（$w_{ms}$ 0.5 対 2.0） | `results/2026-07-26_delay_sweep/table.md` |
 | 図5.5 | $w_{ms}$ に対する各指標の変化 | **取得済み** `.../sweep_ms.png`（日本語化済み） |

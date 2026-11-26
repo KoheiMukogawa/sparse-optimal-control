@@ -72,6 +72,46 @@ def figure_html(num):
             f'{cap}</figure>')
 
 
+# 草稿管理用の節。提出版（build_thesis_tex.py の DROP_SECTIONS）と同じ規則で
+# 通し読み用 HTML からも落とす。Markdown 側には残す（草稿管理に使うため）。
+DROP_SECTIONS = ("本章の図表", "著者が確認", "著者が原典で確認")
+
+
+def drop_draft_notes(md_text):
+    """草稿管理用のメモを落とす。
+
+    落とすもの:
+      - 章末の「本章の図表」「著者が確認・補完すべき箇所」節（本文ごと）
+      - 章冒頭の「草稿（日付）」バナー引用
+
+    図のパスとキャプションは `thesis_figures.py` が各章の .md を直接読むため、
+    ここで表を落としても図の配置には影響しない。
+    """
+    lines = md_text.split("\n")
+    out, i, n = [], 0, len(lines)
+    banner_dropped = False
+    while i < n:
+        line = lines[i]
+        if line.startswith("## "):
+            title = line[3:].strip()
+            if any(title.startswith(d) for d in DROP_SECTIONS):
+                i += 1
+                while i < n and not lines[i].startswith(("## ", "# ")):
+                    i += 1
+                continue
+        # 章冒頭の「草稿（…）」バナーは最初の引用ブロックだけを対象にする
+        if (not banner_dropped and line.startswith("> ") and "草稿" in line):
+            banner_dropped = True
+            while i < n and lines[i].startswith(">"):
+                i += 1
+            while i < n and not lines[i].strip():
+                i += 1
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def insert_figures(md_text, placed):
     """本文で図に初めて言及した段落の直後へ画像を差し込む。
 
@@ -189,6 +229,7 @@ def build(offline=False):
         text = open(path, encoding="utf-8").read()
         title = text.split("\n", 1)[0].lstrip("# ").strip()
         toc.append((i, title))
+        text = drop_draft_notes(text)
         text = insert_figures(text, placed)
         text, store = protect_math(text)
         htm = restore_math(md(text), store)
