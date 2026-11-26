@@ -24,6 +24,10 @@ Condition = namedtuple("Condition", "name reg lam move_suppress")
 # 「S1 で sim 最良だった λ=2 系」の両方を見る。
 DEFAULT_CONDITIONS = [
     Condition("l2", "l2", 1.0, 0.0),
+    # L2+移動抑制。移動抑制が L1 特有か L2 でも効くかを分離するための対照
+    # （研究会の指摘1への回答。L1/L2 × ms なし/あり の2×2を成立させる）。
+    # reg="l2" では lam は使われないので l2 と同じ 1.0 を置く。
+    Condition("l2_ms2", "l2", 1.0, 2.0),
     Condition("l1_lam0.3", "l1", 0.3, 0.0),
     Condition("l1_lam0.3_ms0.5", "l1", 0.3, 0.5),
     Condition("l1_lam0.3_ms2", "l1", 0.3, 2.0),
