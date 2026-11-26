@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>L0 と L1 の関係 ── 棒グラフから組み立てる説明</title>
+<style>
+/* 白黒印刷前提。色は使わず、塗り（黒・灰・白抜き）と線種だけで区別する。
+   rover/fig_style.py の「色に頼らない二重符号化」と同じ方針。 */
+:root{
+  --ink:#1a1a1a;
+  --mid:#8c8c8c;
+  --pale:#e6e6e6;
+  --rule:#1a1a1a;
+}
+@page{ size:A4; margin:20mm 22mm 18mm; }
+
+html{ font-size:10.5pt; }
+body{
+  margin:0; color:var(--ink); background:#fff;
+  font-family:'Hiragino Mincho ProN','Yu Mincho',YuMincho,'Noto Serif JP',serif;
+  line-height:1.85; text-align:justify;
+}
+.doc{ max-width:170mm; margin:0 auto; }
+
+/* 表題 */
+.head{ border-bottom:1.6pt solid var(--rule); padding-bottom:.6em; margin-bottom:1.6em; }
+h1{ font-size:15pt; font-weight:600; line-height:1.5; margin:0 0 .35em; letter-spacing:.02em; }
+.sub{ font-size:9.5pt; line-height:1.7; margin:0 0 .25em; }
+.meta{ font-size:8.5pt; line-height:1.7; margin:0; color:#444; }
+
+h2{
+  font-size:11.5pt; font-weight:600; line-height:1.5;
+  margin:1.9em 0 .7em; page-break-after:avoid; break-after:avoid;
+}
+h2 .no{ display:inline-block; min-width:1.6em; }
+h3{ font-size:10.5pt; font-weight:600; margin:1.4em 0 .4em; page-break-after:avoid; break-after:avoid; }
+p{ margin:0 0 .85em; }
+strong{ font-weight:600; }
+
+/* 図 */
+figure{
+  margin:1.4em 0; page-break-inside:avoid; break-inside:avoid; text-align:center;
+}
+figure svg{ display:block; width:100%; max-width:158mm; height:auto; margin:0 auto; color:var(--ink); }
+figcaption{
+  margin-top:.7em; font-size:8.8pt; line-height:1.7; text-align:left;
+  padding-left:.2em;
+}
+figcaption .fn{ font-weight:600; }
+
+.fill-solid{ fill:var(--ink); }
+.fill-mid{ fill:var(--mid); }
+.fill-pale{ fill:var(--pale); }
+.open{ fill:#fff; stroke:var(--ink); stroke-width:1.2; }
+.box{ fill:none; stroke:var(--ink); stroke-width:1; }
+.ax{ stroke:var(--ink); stroke-width:1; }
+.dash{ stroke:var(--ink); stroke-width:.8; stroke-dasharray:3.5 3; fill:none; }
+.flow{ stroke:var(--ink); stroke-width:1; fill:none; }
+text{ font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif; fill:var(--ink); }
+.lbl{ font-size:11.5px; }
+.lbl-s{ font-size:10.5px; }
+.num{ font-family:'SFMono-Regular',Menlo,monospace; font-size:10.5px; }
+
+/* 表（booktabs 風・罫線は横だけ） */
+table{ width:100%; border-collapse:collapse; margin:1.2em 0; font-size:9pt;
+  page-break-inside:avoid; break-inside:avoid; }
+thead th{ border-top:1.2pt solid var(--rule); border-bottom:.6pt solid var(--rule);
+  padding:.4em .5em; text-align:left; font-weight:600; white-space:nowrap; }
+tbody td{ border-bottom:.3pt solid #bbb; padding:.4em .5em; vertical-align:top; }
+tbody tr:last-child td{ border-bottom:1.2pt solid var(--rule); }
+td.n{ font-family:'SFMono-Regular',Menlo,monospace; white-space:nowrap;
+  font-variant-numeric:tabular-nums; }
+
+/* 箇条書き */
+ul{ margin:.5em 0 .9em; padding-left:1.4em; }
+li{ margin-bottom:.35em; }
+
+/* 定義・式の読み方 */
+dl.def{ margin:1em 0; }
+dl.def dt{ font-family:'SFMono-Regular',Menlo,monospace; font-size:9.5pt; font-weight:600;
+  margin-top:.6em; }
+dl.def dd{ margin:.1em 0 .5em 1.4em; font-size:9.7pt; }
+
+/* 不等式の段組み（式＋理由） */
+.chain{ margin:1.1em 0 1.2em; border-left:2pt solid var(--rule); padding:.3em 0 .3em 1em;
+  page-break-inside:avoid; break-inside:avoid; }
+.chain .row{ display:flex; gap:1.2em; align-items:baseline; margin-bottom:.25em; }
+.chain .f{ font-family:'SFMono-Regular',Menlo,monospace; font-size:9.8pt; white-space:nowrap; }
+.chain .r{ font-size:8.8pt; color:#333; }
+.chain .out{ margin-top:.5em; padding-top:.4em; border-top:.4pt solid #999;
+  font-size:9.7pt; font-weight:600; }
+
+/* 注記（枠は細い実線のみ） */
+.note{ border:.6pt solid var(--rule); padding:.7em .9em; margin:1.2em 0; font-size:9.3pt;
+  line-height:1.75; page-break-inside:avoid; break-inside:avoid; }
+.note .t{ font-weight:600; display:block; margin-bottom:.25em; }
+.note ul{ margin:.35em 0 0; }
+
+/* 引用（口頭の骨） */
+blockquote{ margin:1em 0 1em 0; padding-left:1em; border-left:2pt solid var(--rule);
+  font-size:9.7pt; line-height:1.9; }
+
+code{ font-family:'SFMono-Regular',Menlo,monospace; font-size:.92em; }
+
+footer{ margin-top:2.2em; padding-top:.7em; border-top:.6pt solid var(--rule);
+  font-size:8.3pt; line-height:1.7; color:#333; }
+
+.pb{ page-break-before:page; break-before:page; }
+</style>
+</head>
+<body>
+<div class="doc">
+
+<div class="head">
+  <h1>L0 と L1 の関係 ── 棒グラフから組み立てる説明</h1>
+  <p class="sub">研究会の指摘3「L1 と L0 の関係」への回答を、定理の引用ではなく数え方から組み立てたもの。<br>
+  2026-11-26 の総当たり検証（S8）による論拠の差し替えを反映している。</p>
+  <p class="meta">作成 2026-11-26　｜　対応箇所: 卒論 第2章 §2.3〜§2.6・第3章 §3.4、<code>docs/次回研究発表会への回答事項.md</code> A 節、<code>results/2026-11-26_l0_support/</code></p>
+</div>
+
+<h2><span class="no">1</span>ひとつのグラフから、ふたつの数が取れる</h2>
+
+<p>ロボットが経路を走るあいだ、操舵をどう使ったかを1本のグラフに描く。横軸が時間、縦軸が操舵の大きさである。棒が立っていればその瞬間ハンドルを切っており、棒がなければ手を放している。</p>
+
+<p>この同じ1本のグラフから、性格のまったく違う2つの数が取れる。この区別がつけば、以下の議論の大半は済んだことになる。</p>
+
+<figure>
+<svg viewBox="0 0 640 250" role="img" aria-label="10ステップの操舵の棒グラフ。棒が立っているのは4ステップで高さは1、0.6、0.8、1。残る6ステップはゼロ。">
+  <line class="dash" x1="52" y1="70" x2="596" y2="70"/>
+  <text class="lbl-s" x="600" y="74">全開 = 1</text>
+  <line class="ax" x1="52" y1="190" x2="596" y2="190"/>
+  <line class="ax" x1="52" y1="56" x2="52" y2="190"/>
+  <text class="lbl-s" x="52" y="44">操舵の大きさ</text>
+  <text class="lbl-s" x="596" y="212" text-anchor="end">時間 →</text>
+
+  <rect class="fill-solid" x="112" y="70" width="26" height="120"/>
+  <rect class="fill-solid" x="164" y="118" width="26" height="72"/>
+  <rect class="fill-solid" x="320" y="94" width="26" height="96"/>
+  <rect class="fill-solid" x="476" y="70" width="26" height="120"/>
+
+  <g class="fill-solid">
+    <rect x="60" y="187" width="26" height="3"/>
+    <rect x="216" y="187" width="26" height="3"/>
+    <rect x="268" y="187" width="26" height="3"/>
+    <rect x="372" y="187" width="26" height="3"/>
+    <rect x="424" y="187" width="26" height="3"/>
+    <rect x="528" y="187" width="26" height="3"/>
+  </g>
+
+  <text class="num" x="125" y="62" text-anchor="middle">1</text>
+  <text class="num" x="177" y="110" text-anchor="middle">0.6</text>
+  <text class="num" x="333" y="86" text-anchor="middle">0.8</text>
+  <text class="num" x="489" y="62" text-anchor="middle">1</text>
+
+  <text class="lbl-s" x="73" y="206" text-anchor="middle">0</text>
+  <text class="lbl-s" x="229" y="206" text-anchor="middle">0</text>
+  <text class="lbl-s" x="281" y="206" text-anchor="middle">0</text>
+  <text class="lbl-s" x="385" y="206" text-anchor="middle">0</text>
+  <text class="lbl-s" x="437" y="206" text-anchor="middle">0</text>
+  <text class="lbl-s" x="541" y="206" text-anchor="middle">0</text>
+
+  <text class="lbl" x="52" y="238">10 ステップ中、4 ステップで操舵し、6 ステップは手を放している</text>
+</svg>
+<figcaption><span class="fn">図1</span>　1本の操舵グラフ。この同じ絵から「何本立っているか」と「高さの合計はいくらか」という2つの数が取れる。</figcaption>
+</figure>
+
+<table>
+  <thead><tr><th>測り方</th><th>値</th><th>数え方</th></tr></thead>
+  <tbody>
+    <tr><td>L0 ＝ 動かしていた<strong>時間</strong></td><td class="n">4</td><td>棒が立っている本数を数えるだけ。高さは一切見ない。高さ 0.6 の棒も高さ 1 の棒も、同じ「1本」と数える</td></tr>
+    <tr><td>L1 ＝ 動かした<strong>量</strong></td><td class="n">3.4</td><td>棒の高さを全部足す（1 + 0.6 + 0.8 + 1）。本数は見ない。グラフと横軸ではさまれた面積に当たる</td></tr>
+  </tbody>
+</table>
+
+<h3>卒論の式は、これをそのまま言っている</h3>
+
+<dl class="def">
+  <dt>‖u‖₀ = L(supp u)</dt>
+  <dd><code>supp u</code>（台）は「u がゼロでない時刻を集めたもの」、<code>L</code> は「その長さ」。つなげて読めば<strong>ゼロでない時間の長さ</strong>、すなわち上の「本数」である。</dd>
+  <dt>‖u‖₁ = ∫|u(t)| dt</dt>
+  <dd>∫ は足し算、<code>|u|</code> は向きを無視した大きさ。つなげて読めば<strong>大きさを全部足した値</strong>、すなわち上の「高さの合計」＝面積である。</dd>
+</dl>
+
+<p>本来小さくしたいのは L0 である。L0 が小さい＝操舵している時間が短い＝<strong>手を放している時間が長い</strong>。これが最大ハンズオフ制御の目標そのものである。</p>
+
+<p>ところが L0 は数える量なので、どの瞬間を使いどの瞬間を捨てるかという組み合わせを総当たりするしかなく、現実的な時間では解けない（50 ステップなら 2 の 50 乗通り）。いっぽう L1 は面積なので、凸最適化のソルバが確実に解く。</p>
+
+<p>したがって L1 で代用したい。問題は<strong>代用して本当に差し支えないのか</strong>の一点であり、以下はその検討である。</p>
+
+<h2><span class="no">2</span>ルールはひとつだけ ── 全開を超えられない</h2>
+
+<p>卒論の式 (2.8)(2.13) に <code>‖u‖∞ ≤ 1</code> という制約が入っている。読み方は「どの瞬間の操舵も大きさが 1 を超えない」。1 は全開のことで、実際の上限 <code>u_max</code> で割って単位をそろえてある。</p>
+
+<p>見かけは地味な制約だが、以下の議論はすべてこの「上限 1」に乗っている。上限がなければ L1 と L0 のあいだに関係はつかない。</p>
+
+<h2><span class="no">3</span>L1 は L0 より大きくならない</h2>
+
+<p>5 ステップの例を2つ作り、両方の数を出す。</p>
+
+<figure>
+<svg viewBox="0 0 640 250" role="img" aria-label="2つの例の棒グラフ。例Aは高さ1の棒が2本、例Bは高さ0.5の棒が4本。L1はどちらも2だがL0は2と4で異なる。">
+  <line class="dash" x1="40" y1="70" x2="596" y2="70"/>
+  <text class="lbl-s" x="600" y="74">1</text>
+
+  <text class="lbl" x="40" y="42">例A　全開か、ゼロ</text>
+  <line class="ax" x1="40" y1="170" x2="280" y2="170"/>
+  <rect class="fill-solid" x="52" y="70" width="28" height="100"/>
+  <rect class="fill-solid" x="172" y="70" width="28" height="100"/>
+  <g class="fill-solid">
+    <rect x="92" y="167" width="28" height="3"/>
+    <rect x="132" y="167" width="28" height="3"/>
+    <rect x="212" y="167" width="28" height="3"/>
+  </g>
+  <text class="num" x="66" y="62" text-anchor="middle">1</text>
+  <text class="num" x="186" y="62" text-anchor="middle">1</text>
+  <text class="lbl-s" x="106" y="188" text-anchor="middle">0</text>
+  <text class="lbl-s" x="146" y="188" text-anchor="middle">0</text>
+  <text class="lbl-s" x="226" y="188" text-anchor="middle">0</text>
+  <text class="num" x="40" y="218">本数 L0 = 2　　高さの合計 L1 = 1+1 = 2</text>
+  <text class="lbl" x="40" y="240">ふたつは一致する</text>
+
+  <text class="lbl" x="360" y="42">例B　中途半端にずっと動かす</text>
+  <line class="ax" x1="360" y1="170" x2="600" y2="170"/>
+  <rect class="fill-mid" x="372" y="120" width="28" height="50"/>
+  <rect class="fill-mid" x="412" y="120" width="28" height="50"/>
+  <rect class="fill-mid" x="452" y="120" width="28" height="50"/>
+  <rect class="fill-mid" x="492" y="120" width="28" height="50"/>
+  <rect class="fill-solid" x="532" y="167" width="28" height="3"/>
+  <text class="num" x="386" y="112" text-anchor="middle">0.5</text>
+  <text class="num" x="426" y="112" text-anchor="middle">0.5</text>
+  <text class="num" x="466" y="112" text-anchor="middle">0.5</text>
+  <text class="num" x="506" y="112" text-anchor="middle">0.5</text>
+  <text class="lbl-s" x="546" y="188" text-anchor="middle">0</text>
+  <text class="num" x="360" y="218">本数 L0 = 4　　高さの合計 L1 = 0.5×4 = 2</text>
+  <text class="lbl" x="360" y="240">L1 のほうが小さい</text>
+</svg>
+<figcaption><span class="fn">図2</span>　L1（高さの合計）はどちらも 2 で同じだが、L0（本数）は 2 と 4 で異なる。L1 は「ちょこちょこ長く動かす」例Bを安く見積もる。</figcaption>
+</figure>
+
+<p>理由は棒1本ずつ見れば分かる。</p>
+
+<table>
+  <thead><tr><th>棒の高さ</th><th>L0 への寄与（本数）</th><th>L1 への寄与（高さ）</th><th>大小</th></tr></thead>
+  <tbody>
+    <tr><td class="n">0</td><td class="n">0</td><td class="n">0</td><td>同じ</td></tr>
+    <tr><td class="n">1（全開）</td><td class="n">1</td><td class="n">1</td><td><strong>同じ</strong></td></tr>
+    <tr><td class="n">0.5</td><td class="n">1</td><td class="n">0.5</td><td>L1 が小さい</td></tr>
+    <tr><td class="n">0.1</td><td class="n">1</td><td class="n">0.1</td><td>L1 がずっと小さい</td></tr>
+  </tbody>
+</table>
+
+<p>棒1本について必ず「L1 の寄与 ≤ L0 の寄与」になる。棒がゼロでなければ L0 には必ず 1 が入るのに、L1 に入るのは高さの分（上限 1）だけだからである。全部足しても向きは変わらないので、どんなグラフでも次が成り立つ。</p>
+
+<div class="chain">
+  <div class="row"><span class="f">‖u‖₁ ≤ ‖u‖₀</span><span class="r">動かした量は、動かした時間を超えない（上限 1 による）</span></div>
+</div>
+
+<p>すなわち <strong>L1 は L0 を必ず下から見積もる数</strong>である。</p>
+
+<p>そして表からもう一点読める。<strong>等号になるのは棒の高さが 0 か 1 しかないときに限る。</strong>中途半端な高さの棒が1本でも混じれば、そこで L1 が L0 より小さくなる。この「ゼロか全開だけ」の形を <strong>bang-off-bang</strong> と呼ぶ（bang = 振り切る、off = 止める）。卒論 §2.5 の式 (2.9) はこの形を指している。</p>
+
+<h2><span class="no">4</span>下から見積もる数を最小にして、なぜ本物が最小になるのか</h2>
+
+<p>ここが要点なので、いったんロボットを離れる。</p>
+
+<p>クラスでいちばん背が低い人を知りたい（＝ L0 を最小にしたい）。ところが身長は直接測れず、手元には<strong>必ず実際より小さい値が出る壊れた測定器</strong>しかない（＝ L1 ≤ L0）。これでは通常、最も背が低い人は決められない。測定値が小さい人について、本当に小さいのか測定器が特にサボったのか区別できないからである。</p>
+
+<p>ところが次の2つがそろうと決まる。</p>
+
+<figure>
+<svg viewBox="0 0 640 300" role="img" aria-label="3人の真の身長と測定値の棒グラフ。Aは真値150で測定値も150で一致し測定値が最小。Bは真値180で測定値155、Cは真値165で測定値152。">
+  <line class="ax" x1="60" y1="230" x2="600" y2="230"/>
+  <line class="dash" x1="60" y1="140" x2="420" y2="140"/>
+  <text class="lbl-s" x="600" y="134" text-anchor="end">A の値 150 ── これより下に誰もいない</text>
+
+  <rect class="open" x="96" y="140" width="34" height="90"/>
+  <rect class="fill-solid" x="138" y="140" width="34" height="90"/>
+  <text class="num" x="113" y="132" text-anchor="middle">150</text>
+  <text class="num" x="155" y="132" text-anchor="middle">150</text>
+  <text class="lbl" x="134" y="252" text-anchor="middle">A さん</text>
+  <text class="lbl-s" x="134" y="272" text-anchor="middle">測定値が最小、</text>
+  <text class="lbl-s" x="134" y="288" text-anchor="middle">しかも一致している</text>
+
+  <rect class="open" x="286" y="86" width="34" height="144"/>
+  <rect class="fill-solid" x="328" y="131" width="34" height="99"/>
+  <text class="num" x="303" y="78" text-anchor="middle">180</text>
+  <text class="num" x="345" y="123" text-anchor="middle">155</text>
+  <text class="lbl" x="324" y="252" text-anchor="middle">B さん</text>
+
+  <rect class="open" x="476" y="113" width="34" height="117"/>
+  <rect class="fill-solid" x="518" y="136" width="34" height="94"/>
+  <text class="num" x="493" y="105" text-anchor="middle">165</text>
+  <text class="num" x="535" y="128" text-anchor="middle">152</text>
+  <text class="lbl" x="514" y="252" text-anchor="middle">C さん</text>
+
+  <rect class="open" x="60" y="34" width="14" height="14"/>
+  <text class="lbl-s" x="80" y="46">真の身長（知りたいが測れない）</text>
+  <rect class="fill-solid" x="300" y="34" width="14" height="14"/>
+  <text class="lbl-s" x="320" y="46">測定値（必ず真の値以下に出る）</text>
+</svg>
+<figcaption><span class="fn">図3</span>　測定器は常に小さめに出る。それでも「測定値が最小」かつ「その人だけは測定値が真の値と一致」の2つがそろえば、その人が真に最小だと確定する。白抜きが真の身長、黒塗りが測定値。</figcaption>
+</figure>
+
+<p>A さんの測定値が最小で、しかも A さんについてだけ測定器が正しかったとする。すると誰を持ってきても次が成り立つ。</p>
+
+<div class="chain">
+  <div class="row"><span class="f">A の真の身長 ＝ A の測定値</span><span class="r">A では測定器が正しかった（仮定）</span></div>
+  <div class="row"><span class="f">　　　　　　　 ≤ その人の測定値</span><span class="r">A の測定値が全員のなかで最小だから</span></div>
+  <div class="row"><span class="f">　　　　　　　 ≤ その人の真の身長</span><span class="r">測定器は誰に対しても小さめに出るから</span></div>
+  <div class="out">→ A の真の身長 ≤ 誰の真の身長。すなわち A さんが真にいちばん背が低い。</div>
+</div>
+
+<p>ここで重要なのは、<strong>測定器が他の人に対して正しいかどうかを一切使っていない</strong>点である。A さん1人について一致していれば足りる。</p>
+
+<h3>ロボットの話に戻す</h3>
+
+<table>
+  <thead><tr><th>身長の話</th><th>制御の話</th></tr></thead>
+  <tbody>
+    <tr><td>知りたい真の身長</td><td>L0（手を放していない時間）＝本来最小化したい量</td></tr>
+    <tr><td>測れる測定値</td><td>L1（動かした量）＝実際に解ける量</td></tr>
+    <tr><td>測定器は必ず小さめに出る</td><td>‖u‖₁ ≤ ‖u‖₀（第3節の不等式）</td></tr>
+    <tr><td>A では測定器が正しい</td><td>その解が bang-off-bang（高さが 0 か全開だけ）</td></tr>
+  </tbody>
+</table>
+
+<p>L1 を最小にする解を <code>u*</code> と書く。もし <code>u*</code> が bang-off-bang であれば、どんな入力 <code>u</code> に対しても次が成り立つ。</p>
+
+<div class="chain">
+  <div class="row"><span class="f">‖u*‖₀ ＝ ‖u*‖₁</span><span class="r">u* は 0 か全開しかない ＝ 等号の条件を満たす</span></div>
+  <div class="row"><span class="f">　　　　 ≤ ‖u‖₁</span><span class="r">u* は L1 を最小にした解だから</span></div>
+  <div class="row"><span class="f">　　　　 ≤ ‖u‖₀</span><span class="r">第3節の不等式（任意の u で成立）</span></div>
+  <div class="out">→ ‖u*‖₀ ≤ ‖u‖₀。L1 を解いて得た解が、L0 の解でもあることになる。</div>
+</div>
+
+<p>これが卒論 §2.5 で参考文献 [6] として引いている主張の中身である。現在は引用のみで済ませているが、この3行で説明できる。定理1（可到達性＋A の正則性）を経由しないため、A が冪零な本研究の系でも使える経路である。</p>
+
+<p>そのかわり、あらかじめ保証するのではなく<strong>解いてから解の形を見て判定する</strong>手順になる。</p>
+
+<figure>
+<svg viewBox="0 0 560 530" role="img" aria-label="流れ図。L0最小化は解けないのでL1最小化に置き換え、解を得たのち、その解が0と全開だけかを確認する。そうなっていればL0の答えでもあり、なっていなければ等価は保証されない。">
+  <defs>
+    <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1a1a1a"/>
+    </marker>
+  </defs>
+
+  <rect class="box" x="130" y="20" width="300" height="60"/>
+  <text class="lbl" x="280" y="45" text-anchor="middle">L0 を最小化したい</text>
+  <text class="lbl-s" x="280" y="65" text-anchor="middle">＝手を放している時間を最大にしたい</text>
+
+  <line class="flow" x1="280" y1="80" x2="280" y2="128" marker-end="url(#ar1)"/>
+  <text class="lbl-s" x="292" y="108">組み合わせが爆発して直接は解けない</text>
+
+  <rect class="box" x="130" y="130" width="300" height="60"/>
+  <text class="lbl" x="280" y="155" text-anchor="middle">L1 を最小化する問題に置き換える</text>
+  <text class="lbl-s" x="280" y="175" text-anchor="middle">＝高さの合計（面積）を最小に</text>
+
+  <line class="flow" x1="280" y1="190" x2="280" y2="238" marker-end="url(#ar1)"/>
+  <text class="lbl-s" x="292" y="218">凸最適化なので確実に解ける</text>
+
+  <rect class="box" x="130" y="240" width="300" height="48"/>
+  <text class="lbl" x="280" y="269" text-anchor="middle">解 u* が得られる</text>
+
+  <line class="flow" x1="280" y1="288" x2="280" y2="336" marker-end="url(#ar1)"/>
+  <text class="lbl-s" x="292" y="316">出てきた波形を見る</text>
+
+  <rect x="130" y="338" width="300" height="52" fill="none" stroke="#1a1a1a" stroke-width="1" stroke-dasharray="5 3"/>
+  <text class="lbl" x="280" y="370" text-anchor="middle">u* の高さは 0 と全開だけか？</text>
+
+  <path class="flow" d="M 200 390 L 200 420 L 150 420 L 150 452" marker-end="url(#ar1)"/>
+  <text class="lbl-s" x="192" y="412" text-anchor="end">はい</text>
+  <path class="flow" d="M 360 390 L 360 420 L 420 420 L 420 452" marker-end="url(#ar1)"/>
+  <text class="lbl-s" x="368" y="412">いいえ</text>
+
+  <rect x="30" y="454" width="240" height="56" fill="none" stroke="#1a1a1a" stroke-width="1.8"/>
+  <text class="lbl" x="150" y="478" text-anchor="middle">u* は L0 の答えでもある</text>
+  <text class="lbl-s" x="150" y="497" text-anchor="middle">最大ハンズオフ制御が解けた</text>
+
+  <rect class="box" x="300" y="454" width="230" height="56"/>
+  <text class="lbl" x="415" y="478" text-anchor="middle">等価だとは言えない</text>
+  <text class="lbl-s" x="415" y="497" text-anchor="middle">L1 の解にとどまる</text>
+</svg>
+<figcaption><span class="fn">図4</span>　卒論が採っている経路。定理1 を通らないため A が冪零な本研究の系でも使えるが、そのかわり「解いてから形を確認する」手順になる。§2.6 がその確認作業に当たり、実測の答えは第5節のとおり「いいえ」だった。</figcaption>
+</figure>
+
+<p><strong>この3行はまるごと「もし u* が bang-off-bang なら」という仮定の上に乗っており、仮定が外れれば1行目の等号が崩れて議論全体が止まる。</strong>したがって次に確かめるべきは、実際にそうなっていたのかである。</p>
+
+<h2><span class="no">5</span>実測 ── 厳密な 3 値ではなかった</h2>
+
+<div class="note">
+  <span class="t">2026-11-26 の訂正</span>
+  卒論 <code>chapter2.md:294-295</code> は §2.6 の解について「δω が <code>{−1, 0, +1}</code> の3値のみをとる bang-off-bang 構造」と書いているが、実測すると<strong>厳密には3値ではない</strong>（<code>results/2026-11-26_l0_support/notes.md</code> 所見3）。第4節の前提は満たされていない。
+</div>
+
+<p>§2.6 の数値実験（h = 0.1 s、V = 1.0 m/s、50 ステップ、初期誤差 2.0 m・1.0 m・30°）の解を実際に数えると、次のようになっている。</p>
+
+<figure>
+<svg viewBox="0 0 640 350" role="img" aria-label="δωの50ステップのうち39がゼロ、11が非ゼロ。非ゼロ11成分の値はマイナス1が7個、プラス1が2個、残る2個はマイナス0.94274とプラス0.70675という中間値。">
+  <text class="lbl" x="70" y="30">δω の 50 ステップ</text>
+  <rect class="fill-pale" x="70" y="42" width="390" height="24"/>
+  <rect class="box" x="70" y="42" width="390" height="24"/>
+  <rect class="fill-solid" x="460" y="42" width="110" height="24"/>
+  <text class="lbl-s" x="265" y="86" text-anchor="middle">ゼロ 39 ステップ（78%）＝手を放している</text>
+  <text class="lbl-s" x="515" y="86" text-anchor="middle">非ゼロ 11</text>
+
+  <line class="dash" x1="70" y1="106" x2="570" y2="106"/>
+
+  <text class="lbl" x="70" y="132">非ゼロ 11 成分の値を並べると</text>
+
+  <line class="ax" x1="100" y1="240" x2="580" y2="240"/>
+  <text class="num" x="120" y="260" text-anchor="middle">−1</text>
+  <text class="num" x="340" y="260" text-anchor="middle">0</text>
+  <text class="num" x="560" y="260" text-anchor="middle">+1</text>
+
+  <g class="fill-solid">
+    <circle cx="120" cy="230" r="6"/><circle cx="120" cy="214" r="6"/><circle cx="120" cy="198" r="6"/>
+    <circle cx="120" cy="182" r="6"/><circle cx="120" cy="166" r="6"/><circle cx="120" cy="150" r="6"/>
+    <circle cx="120" cy="134" r="6"/>
+    <circle cx="560" cy="230" r="6"/><circle cx="560" cy="214" r="6"/>
+  </g>
+  <text class="lbl-s" x="140" y="150">−1 が 7 個</text>
+  <text class="lbl-s" x="540" y="206" text-anchor="end">+1 が 2 個</text>
+  <text class="lbl" x="340" y="152" text-anchor="middle">9/11 は飽和値 ±1</text>
+
+  <line class="dash" x1="133" y1="240" x2="133" y2="286"/>
+  <line class="dash" x1="496" y1="240" x2="496" y2="286"/>
+  <circle class="open" cx="133" cy="292" r="6"/>
+  <circle class="open" cx="496" cy="292" r="6"/>
+  <text class="num" x="148" y="297">−0.94274</text>
+  <text class="num" x="496" y="316" text-anchor="middle">+0.70675</text>
+  <text class="lbl" x="70" y="340">残る 2/11 は中間値（白丸）→ 厳密な 3 値ではない</text>
+</svg>
+<figcaption><span class="fn">図5</span>　§2.6 の解の実測値。ゼロは確かに 39/50 あり、非ゼロの 9/11 は飽和値に張り付いている。だが <strong>−0.94274 と +0.70675 の2成分は中間値</strong>で、許容 10⁻² で丸めても中間のままだった。−0.94274 は −1 のすぐ隣に見えるが −1 ではない。</figcaption>
+</figure>
+
+<p>さらに、並進補正 δv は<strong>全 50 ステップが非ゼロ（一律 −0.4）</strong>で、こちらは bang-off-bang から程遠い。</p>
+
+<p>第3節の等号条件は「高さが 0 か 1 しかない」であった。中間値が2個混じるため<strong>等号は成り立たず、第4節の1行目が書けない。</strong>すなわち文献 [6] の結論の前提が、この事例では満たされていない。身長の例えで言えば、<strong>「A さんについてだけは測定器が正しかった」という肝心の確認が取れなかった</strong>ことになる。</p>
+
+<h2><span class="no">6</span>総当たりで L0 の答えを直接数えた</h2>
+
+<p>前提が満たせないなら、推論に頼らず<strong>総当たりで L0 の解そのものを求めればよい</strong>。これが 2026-11-26 に実施した S8（<code>rover/l0_bruteforce.py</code>）である。</p>
+
+<p>手順は素朴である。「どのステップを使うか」の組み合わせを、使うステップ数 k の小さい順に全部試し、目標に到達できる最小の k を見つける。そのうえで<strong>その最小の支持だけに限定して L1 を解き直し、制限なしで解いたときと同じ L1 最適値に届くかを見る</strong>。届けば「L1 の最適解のなかに L0 最適なものが存在する」と言える。</p>
+
+<figure>
+<svg viewBox="0 0 600 300" role="img" aria-label="3段の比較。ソルバが返したL1解は10ステップすべてが活性。総当たりで求めたL0最小の支持は3ステップ。その3ステップだけに限定してL1を解いてもL1最適値は変わらない。">
+  <text class="lbl" x="70" y="28">① ソルバが返した L1 解　　活性 10 / 10</text>
+  <rect class="box" x="70" y="40" width="400" height="30"/>
+  <g class="fill-solid">
+    <rect x="72" y="42" width="36" height="26"/><rect x="112" y="42" width="36" height="26"/>
+    <rect x="152" y="42" width="36" height="26"/><rect x="192" y="42" width="36" height="26"/>
+    <rect x="232" y="42" width="36" height="26"/><rect x="272" y="42" width="36" height="26"/>
+    <rect x="312" y="42" width="36" height="26"/><rect x="352" y="42" width="36" height="26"/>
+    <rect x="392" y="42" width="36" height="26"/><rect x="432" y="42" width="36" height="26"/>
+  </g>
+  <text class="lbl-s" x="484" y="60">疎ではない</text>
+
+  <text class="lbl" x="70" y="118">② 総当たりで求めた L0 最小の支持　　3 ステップ</text>
+  <rect class="box" x="70" y="130" width="400" height="30"/>
+  <g class="fill-solid">
+    <rect x="112" y="132" width="36" height="26"/><rect x="232" y="132" width="36" height="26"/>
+    <rect x="392" y="132" width="36" height="26"/>
+  </g>
+  <text class="lbl-s" x="484" y="150">これが真の最小</text>
+
+  <defs>
+    <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1a1a1a"/>
+    </marker>
+  </defs>
+  <line class="flow" x1="270" y1="162" x2="270" y2="204" marker-end="url(#ar3)"/>
+  <text class="lbl-s" x="282" y="188">この 3 つ以外をゼロに固定して L1 を解き直す</text>
+
+  <text class="lbl" x="70" y="226">③ 結果</text>
+  <rect x="70" y="238" width="400" height="44" fill="none" stroke="#1a1a1a" stroke-width="1.8"/>
+  <text class="lbl" x="270" y="258" text-anchor="middle">L1 最適値は制限なしのときと同じ</text>
+  <text class="lbl-s" x="270" y="275" text-anchor="middle">差は 10⁻⁶ 未満 → L0 最小の支持の上に L1 最適解が存在する</text>
+</svg>
+<figcaption><span class="fn">図6</span>　S8 の考え方（初期誤差 0.05 m・0.05 m・5°、n = 10 の事例。活性する位置は模式）。ソルバが返す解は10ステップ全部を使っていたが、実際は3ステップで足りる。そしてその3ステップだけでも L1 の最適値は落ちない。</figcaption>
+</figure>
+
+<p>総当たりできた6事例すべてでこれが成り立った。</p>
+
+<table>
+  <thead><tr><th>初期誤差 x₀</th><th>n</th><th>L1 解の活性数</th><th>L0 最小</th><th>最小支持の数</th><th>L0 最小の支持上に L1 最適解</th></tr></thead>
+  <tbody>
+    <tr><td class="n">(0.05, 0.05, 5°)</td><td class="n">6</td><td class="n">6</td><td class="n">5</td><td class="n">1</td><td><strong>はい</strong></td></tr>
+    <tr><td class="n">(0.05, 0.05, 5°)</td><td class="n">10</td><td class="n">10</td><td class="n">3</td><td class="n">8</td><td><strong>はい</strong></td></tr>
+    <tr><td class="n">(0.10, 0.10, 10°)</td><td class="n">10</td><td class="n">10</td><td class="n">6</td><td class="n">2</td><td><strong>はい</strong></td></tr>
+    <tr><td class="n">(0.00, 0.20, 20°)</td><td class="n">15</td><td class="n">11</td><td class="n">11</td><td class="n">7</td><td><strong>はい</strong>（活性数も一致）</td></tr>
+    <tr><td class="n">(0.10, 0.20, 15°)</td><td class="n">20</td><td class="n">20</td><td class="n">7</td><td class="n">281</td><td><strong>はい</strong></td></tr>
+    <tr><td class="n">(0.00, 0.10, 0°)</td><td class="n">20</td><td class="n">2</td><td class="n">2</td><td class="n">55</td><td><strong>はい</strong>（活性数も一致）</td></tr>
+    <tr><td class="n">(2.0, 1.0, 30°)</td><td class="n">50</td><td class="n">50</td><td>総当たり不能</td><td>—</td><td>下界 20（活性 50 は下界の 2.5 倍）</td></tr>
+  </tbody>
+</table>
+
+<p>最後の行が §2.6 の事例で、2 の 50 乗通りあるため総当たりできない。ただし活性ステップ数の厳密な下界は <code>⌈|x₀ˣ|/(h·u_max)⌉ = 20</code> と計算できる（δv は x 方向にしか効かず、合計が x₀ˣ に等しくなければならないため）。</p>
+
+<p><strong>これは主張が弱くなる訂正ではない。</strong>「定理の前提に合わせて主張を限定する」から「自分の系で数値的に検証した」へ、根拠が推論から実証に変わっている。しかも bang-off-bang という前提に依存しないため、文献 [6] 経由の論拠より強い。</p>
+
+<h2><span class="no">7</span>L1 を解いても疎な解が出るとは限らない</h2>
+
+<p>図6 の①で、ソルバが 3 ステップで足りるところを 10 ステップ全部使っていた。これは偶然ではなく、L1 最小化の性質である。</p>
+
+<p><strong>L1 問題は、最適値が一意でも最適解は一意ではない。</strong>第1節の例A と例B を思い出すと、「高さ 1 を 2 本」と「高さ 0.5 を 4 本」は L1 がどちらも 2 で区別がつかなかった。<strong>L1 から見て同点の解が複数あるとき、どれが返るかはソルバ任せ</strong>になる。§2.6 の δv で起きているのはこれである。</p>
+
+<figure>
+<svg viewBox="0 0 640 300" role="img" aria-label="δvの2つの解。上はソルバが返した一律マイナス0.4が50ステップ続く解でL1は20、L0は50。下は同じL1値20を持つマイナス1が20ステップと残り30ステップがゼロの疎な解でL0は20。">
+  <text class="lbl" x="70" y="26">① ソルバが返した δv　　一律 −0.4 が 50 ステップ</text>
+  <line class="ax" x1="70" y1="40" x2="580" y2="40"/>
+  <g class="fill-mid">
+    <rect x="70" y="40" width="7" height="24"/><rect x="80" y="40" width="7" height="24"/><rect x="90" y="40" width="7" height="24"/><rect x="100" y="40" width="7" height="24"/><rect x="110" y="40" width="7" height="24"/>
+    <rect x="120" y="40" width="7" height="24"/><rect x="130" y="40" width="7" height="24"/><rect x="140" y="40" width="7" height="24"/><rect x="150" y="40" width="7" height="24"/><rect x="160" y="40" width="7" height="24"/>
+    <rect x="170" y="40" width="7" height="24"/><rect x="180" y="40" width="7" height="24"/><rect x="190" y="40" width="7" height="24"/><rect x="200" y="40" width="7" height="24"/><rect x="210" y="40" width="7" height="24"/>
+    <rect x="220" y="40" width="7" height="24"/><rect x="230" y="40" width="7" height="24"/><rect x="240" y="40" width="7" height="24"/><rect x="250" y="40" width="7" height="24"/><rect x="260" y="40" width="7" height="24"/>
+    <rect x="270" y="40" width="7" height="24"/><rect x="280" y="40" width="7" height="24"/><rect x="290" y="40" width="7" height="24"/><rect x="300" y="40" width="7" height="24"/><rect x="310" y="40" width="7" height="24"/>
+    <rect x="320" y="40" width="7" height="24"/><rect x="330" y="40" width="7" height="24"/><rect x="340" y="40" width="7" height="24"/><rect x="350" y="40" width="7" height="24"/><rect x="360" y="40" width="7" height="24"/>
+    <rect x="370" y="40" width="7" height="24"/><rect x="380" y="40" width="7" height="24"/><rect x="390" y="40" width="7" height="24"/><rect x="400" y="40" width="7" height="24"/><rect x="410" y="40" width="7" height="24"/>
+    <rect x="420" y="40" width="7" height="24"/><rect x="430" y="40" width="7" height="24"/><rect x="440" y="40" width="7" height="24"/><rect x="450" y="40" width="7" height="24"/><rect x="460" y="40" width="7" height="24"/>
+    <rect x="470" y="40" width="7" height="24"/><rect x="480" y="40" width="7" height="24"/><rect x="490" y="40" width="7" height="24"/><rect x="500" y="40" width="7" height="24"/><rect x="510" y="40" width="7" height="24"/>
+    <rect x="520" y="40" width="7" height="24"/><rect x="530" y="40" width="7" height="24"/><rect x="540" y="40" width="7" height="24"/><rect x="550" y="40" width="7" height="24"/><rect x="560" y="40" width="7" height="24"/>
+  </g>
+  <text class="num" x="70" y="94">L1 ＝ 0.4 × 50 ＝ 20　　L0 ＝ 50（ゼロが1つもない）</text>
+
+  <line class="dash" x1="70" y1="120" x2="580" y2="120"/>
+
+  <text class="lbl" x="70" y="150">② 同じ L1 値をもつ疎な解　　−1 を 20 ステップ、あとはゼロ</text>
+  <line class="ax" x1="70" y1="164" x2="580" y2="164"/>
+  <g class="fill-solid">
+    <rect x="70" y="164" width="7" height="60"/><rect x="80" y="164" width="7" height="60"/><rect x="90" y="164" width="7" height="60"/><rect x="100" y="164" width="7" height="60"/><rect x="110" y="164" width="7" height="60"/>
+    <rect x="120" y="164" width="7" height="60"/><rect x="130" y="164" width="7" height="60"/><rect x="140" y="164" width="7" height="60"/><rect x="150" y="164" width="7" height="60"/><rect x="160" y="164" width="7" height="60"/>
+    <rect x="170" y="164" width="7" height="60"/><rect x="180" y="164" width="7" height="60"/><rect x="190" y="164" width="7" height="60"/><rect x="200" y="164" width="7" height="60"/><rect x="210" y="164" width="7" height="60"/>
+    <rect x="220" y="164" width="7" height="60"/><rect x="230" y="164" width="7" height="60"/><rect x="240" y="164" width="7" height="60"/><rect x="250" y="164" width="7" height="60"/><rect x="260" y="164" width="7" height="60"/>
+  </g>
+  <g class="fill-solid">
+    <rect x="270" y="164" width="7" height="3"/><rect x="290" y="164" width="7" height="3"/><rect x="310" y="164" width="7" height="3"/><rect x="330" y="164" width="7" height="3"/>
+    <rect x="350" y="164" width="7" height="3"/><rect x="370" y="164" width="7" height="3"/><rect x="390" y="164" width="7" height="3"/><rect x="410" y="164" width="7" height="3"/>
+    <rect x="430" y="164" width="7" height="3"/><rect x="450" y="164" width="7" height="3"/><rect x="470" y="164" width="7" height="3"/><rect x="490" y="164" width="7" height="3"/>
+    <rect x="510" y="164" width="7" height="3"/><rect x="530" y="164" width="7" height="3"/><rect x="550" y="164" width="7" height="3"/>
+  </g>
+  <text class="lbl-s" x="420" y="200" text-anchor="middle">30 ステップは手を放している</text>
+  <text class="num" x="70" y="254">L1 ＝ 1.0 × 20 ＝ 20　　L0 ＝ 20</text>
+  <text class="lbl" x="70" y="284">L1 は同点。だが L0 では ② が 30 ステップ分も優れている</text>
+</svg>
+<figcaption><span class="fn">図7</span>　δv は x 方向にしか効かず、合計が初期誤差に等しければよい。したがって「一律 −0.4 を 50 回」も「−1 を 20 回」も L1 は同じ 20 であり、ソルバは密なほう（灰）を返した。これが図2.5 の δv にゼロが1つもない理由である。</figcaption>
+</figure>
+
+<p>総当たりの6事例でも、ソルバの活性数が L0 最小を上回る例が 4/6 あった（n = 20 の事例では 20 対 7）。すなわち<strong>「L1 を解けば疎な解が出る」は自動ではない。</strong></p>
+
+<p>MPC では毎周期解き直して先頭の入力しか使わないため実害は小さいが、オープンループで全区間を一度に解く §2.6 では正面から効く。口頭試問で図2.5 の δv を指された場合、この説明が必要になる。</p>
+
+<h2><span class="no">8</span>なぜ L2 ではなく L1 なのか</h2>
+
+<p>L1 が L0 を下から見積もるのなら、下から見積もる関数は他にもある。実際あるが、L1 には特別な地位がある。横軸に操舵の大きさ、縦軸に「そのとき払う罰金」をとって3つを重ねる。</p>
+
+<figure>
+<svg viewBox="0 0 560 330" role="img" aria-label="罰金関数の比較。L0は0でだけ0でそれ以外は1の階段、L1は原点に角を持つV字、L2は原点が平らな放物線。L1は階段を下から支える最も高い折れ線になっている。">
+  <line class="ax" x1="60" y1="260" x2="500" y2="260"/>
+  <line class="ax" x1="280" y1="50" x2="280" y2="276"/>
+  <text class="lbl-s" x="500" y="280" text-anchor="end">操舵の大きさ →</text>
+  <text class="lbl-s" x="280" y="42" text-anchor="middle">罰金</text>
+  <text class="num" x="274" y="276" text-anchor="end">0</text>
+  <text class="num" x="480" y="276">1</text>
+  <text class="num" x="80" y="276">−1</text>
+  <line class="dash" x1="60" y1="80" x2="500" y2="80"/>
+  <text class="num" x="54" y="84" text-anchor="end">1</text>
+
+  <polyline fill="none" stroke="#1a1a1a" stroke-width="1.6" stroke-dasharray="2 3" points="80,80 276,80"/>
+  <polyline fill="none" stroke="#1a1a1a" stroke-width="1.6" stroke-dasharray="2 3" points="284,80 480,80"/>
+  <circle cx="280" cy="260" r="4" fill="#1a1a1a"/>
+  <text class="lbl" x="488" y="76">L0 の罰金（点線）</text>
+  <text class="lbl-s" x="488" y="94">少しでも動かせば即 1</text>
+
+  <polyline fill="none" stroke="#1a1a1a" stroke-width="2.6" points="80,80 280,260 480,80"/>
+  <text class="lbl" x="96" y="140">L1 ＝ |x|（太実線）</text>
+  <text class="lbl-s" x="96" y="158">原点に角がある</text>
+
+  <polyline fill="none" stroke="#1a1a1a" stroke-width="1.4" stroke-dasharray="8 4" points="80,80 130,158 180,215 230,249 280,260 330,249 380,215 430,158 480,80"/>
+  <text class="lbl" x="348" y="186">L2 ＝ x²（破線）</text>
+  <text class="lbl-s" x="348" y="204">原点が平ら</text>
+
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1a1a1a"/>
+    </marker>
+  </defs>
+  <line class="flow" x1="300" y1="300" x2="283" y2="266" marker-end="url(#ar2)"/>
+  <text class="lbl-s" x="306" y="306">ここの形がすべてを決める</text>
+</svg>
+<figcaption><span class="fn">図8</span>　3つの罰金の形。点線の階段が本来課したい罰金（L0）であり、それを下から支えられる折れ線のうち<strong>いちばん高い＝いちばん階段に近い</strong>のが L1 である。L2 は原点が平らなため階段からはるかに下に垂れる。</figcaption>
+</figure>
+
+<table>
+  <thead><tr><th>罰金</th><th>原点のまわりの形</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td>L0</td><td>ゼロなら 0、少しでも動かせば即 1（段差）</td><td>本来課したい罰金だが、段差のため最適化にかけられない</td></tr>
+    <tr><td>L1 ＝ |x|</td><td><strong>角</strong>がある。ゼロから離れた瞬間に傾き 1 で立ち上がる</td><td>「少しだけ動かす」が高くつくので、最適解はきっぱりゼロを選ぶ</td></tr>
+    <tr><td>L2 ＝ x²</td><td><strong>平ら</strong>。0.1 動かしても罰金は 0.01</td><td>「少しだけ動かす」がほぼ無料。ゼロにならず常に動き続ける（L2-MPC が常時操舵になる理由）</td></tr>
+  </tbody>
+</table>
+
+<p>すなわち <strong>L1 は L0 の段差を下から支えられる関数のうち最も階段に近いもの</strong>である。任意に選んだ代用品ではなく、「解ける形のなかで L0 にいちばん近いもの」として選ばれている。これが「なぜ L1 なのか」の答えである。</p>
+
+<h3>角があることの実際の効き方 ── 不感帯</h3>
+
+<p>原点の角は、コントローラの振る舞いとしては<strong>不感帯</strong>として現れる。誤差が小さいうちは補正をまったく打たず、ある大きさを超えたところで打ち始める。</p>
+
+<figure>
+<svg viewBox="0 0 480 300" role="img" aria-label="軟しきい値の入出力特性。入力がプラスマイナスラムダの範囲では出力がゼロになり、その外では傾き1の直線になる。L2の場合は原点を通る直線で常に出力が出る。">
+  <rect class="fill-pale" x="210" y="30" width="60" height="240"/>
+  <line class="ax" x1="60" y1="150" x2="420" y2="150"/>
+  <line class="ax" x1="240" y1="30" x2="240" y2="270"/>
+  <text class="lbl-s" x="420" y="170" text-anchor="end">打ちたい補正の大きさ →</text>
+  <text class="lbl-s" x="240" y="24" text-anchor="middle">実際に打つ補正</text>
+
+  <line class="dash" x1="210" y1="30" x2="210" y2="270"/>
+  <line class="dash" x1="270" y1="30" x2="270" y2="270"/>
+  <text class="num" x="210" y="286" text-anchor="middle">−λ</text>
+  <text class="num" x="270" y="286" text-anchor="middle">+λ</text>
+
+  <polyline fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-dasharray="7 4" points="120,270 360,30"/>
+  <text class="lbl-s" x="364" y="42">L2 ならこの直線</text>
+  <text class="lbl-s" x="364" y="58">（常に少し動く）</text>
+
+  <polyline fill="none" stroke="#1a1a1a" stroke-width="2.8" points="120,240 210,150 270,150 360,60"/>
+  <text class="lbl" x="240" y="140" text-anchor="middle">不感帯：打たない</text>
+  <text class="lbl-s" x="124" y="258">L1 の場合（太実線）</text>
+</svg>
+<figcaption><span class="fn">図9</span>　L1 を入れると小さい補正はゼロに潰れ（不感帯）、大きい補正はそのまま通る。卒論 §2.5 の「軟しきい値作用」はこの図を指す。λ が不感帯の幅を決める。</figcaption>
+</figure>
+
+<h2><span class="no">9</span>u ではなく補正 δu に掛ける</h2>
+
+<p>最後に、原理論から本研究への変更点をこの図の上で確認する。</p>
+
+<p>速度そのもの <code>u</code> を疎にすると、ゼロである時間が最大化されるため<strong>ロボットが走行そのものを止めてしまい</strong>、経路追従にならない。そこで疎にする対象を、参照速度からの<strong>補正 δu</strong> に変える。</p>
+
+<figure>
+<svg viewBox="0 0 640 340" role="img" aria-label="上段は実際の操舵が参照値のまわりで数回だけ変化する階段波形、下段はその補正量が大半ゼロで数回だけスパイクする波形。">
+  <text class="lbl" x="60" y="34">上段：実際の操舵 ω ＝ 参照 ω_r ＋ 補正 δω</text>
+  <line class="dash" x1="60" y1="90" x2="588" y2="90"/>
+  <text class="lbl-s" x="592" y="94">ω_r</text>
+  <polyline fill="none" stroke="#1a1a1a" stroke-width="1.6" points="60,90 148,90 148,55 192,55 192,90 324,90 324,125 368,125 368,90 456,90 456,55 500,55 500,90 588,90"/>
+  <text class="lbl-s" x="230" y="78">参照どおり巡航している</text>
+
+  <text class="lbl" x="60" y="200">下段：補正 δω（L1 で疎にする対象）</text>
+  <line class="ax" x1="60" y1="260" x2="588" y2="260"/>
+  <text class="num" x="52" y="264" text-anchor="end">0</text>
+  <polyline fill="none" stroke="#1a1a1a" stroke-width="2.4" points="60,260 148,260 148,225 192,225 192,260 324,260 324,295 368,295 368,260 456,260 456,225 500,225 500,260 588,260"/>
+  <text class="lbl-s" x="230" y="252">δω = 0 ＝ 手を放している</text>
+  <text class="lbl" x="60" y="330">「補正を打つ瞬間だけ動かし、あとは参照どおり流す」＝経路追従で意味のあるハンズオフ</text>
+</svg>
+<figcaption><span class="fn">図10</span>　疎にするのは下段の δω。δω = 0 の区間でロボットは止まるのではなく、参照速度のまま巡航している。卒論 §3.4 が「補正 δu を penalize する」と言っているのはこの図である。</figcaption>
+</figure>
+
+<h2><span class="no">10</span>主張すること、しないこと</h2>
+
+<p>以上を踏まえると、言える範囲は次のように整理される。</p>
+
+<table>
+  <thead><tr><th>論拠の経路</th><th>成否</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td>定理1（文献 [3]）で一致を言う</td><td><strong>使えない</strong></td><td>十分条件は可到達性 ＋ A の正則性。本研究の A は冪零（A² = O・det A = 0・rank A = 1）</td></tr>
+    <tr><td>単入力に縮約して定理1 を使う</td><td><strong>使えない</strong></td><td>δω のみに縮約すると可到達性まで失う（rank 2 &lt; 3）</td></tr>
+    <tr><td>文献 [6]（bang-off-bang 経由）</td><td><strong>前提を満たさない</strong></td><td>§2.6 の解は 9/11 が飽和値だが 2 成分が中間値（第5節）</td></tr>
+    <tr><td><strong>S8: L0 総当たりとの直接照合</strong></td><td><strong>使える</strong></td><td>検証した全6事例で「L0 最小の支持上に L1 最適解が存在」（第6節）</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <span class="t">言ってはいけないこと</span>
+  <ul>
+    <li><strong>「定理1 により一致する」</strong>── 十分条件を満たしていない。</li>
+    <li><strong>「L1 なら必ず L0 最適」「本研究の MPC 解は必ず bang-off-bang」</strong>── 初期値依存であり、実際 §2.6 の解は厳密な3値ではない。</li>
+    <li><strong>「L0 最小化は NP 困難」</strong>── 参考文献 [3] の本文にこの語は無い（2026-10-13 の原典確認）。帰属の誤りなので使わない。言うなら「支持集合の組合せ爆発」。</li>
+  </ul>
+</div>
+
+<h3>そもそも本研究の定式化は純粋な最大ハンズオフ問題ではない</h3>
+
+<p>これも先に開示すべき点である。本研究が解いているのは次の問題である。</p>
+
+<ul>
+  <li>L1 を課す対象が入力 u ではなく<strong>参照速度からの補正 δu</strong>（第9節）</li>
+  <li>追従誤差の二次コストと<strong>移動抑制項が併存する</strong>（<code>rover/mpc_core.py:82-92</code>）</li>
+</ul>
+
+<p>したがって <strong>L0 最適性そのものは本研究の主張ではない。</strong>L1 を使う理由は「罰金が原点で角をもつため厳密なゼロを生む」（第8節）という性質であり、δu = 0 に張り付く区間を作ることが目的である。L0 は<strong>「やりたいことの定式化」として参照するが、成立を主張する対象ではない</strong>。</p>
+
+<div class="note">
+  <span class="t">卒論に反映する 4 項目（未実施）</span>
+  <ul>
+    <li>§2.6 の bang-off-bang の記述を実測値（9/11 が ±1・2 成分が中間値）に直す ── <code>chapter2.md:294-295</code></li>
+    <li>§2.5 の等価性の論拠を [6] 単独から <strong>[6] ＋ S8 の数値検証</strong>に差し替える</li>
+    <li>§8.2(6b) を「未実施の提案」から「実施済み・結果」に書き換える</li>
+    <li>L1 解の非一意性（第7節）を §2.6 または第7章の限界に 1 項として足す</li>
+  </ul>
+  このほか、第3節の不等式は「上限 1 の箱」が対称にかかる §2.6 の式 (2.13) で成り立つ。§3.4 の MPC は制約が実速度 <code>|u_nom + δu| ≤ u_max</code> に付いており δu の可動範囲が左右非対称になるため、等価性の議論は §2.6 の定式化で行い、§3.4 では「L1 項は ‖δu‖₀ の凸緩和として入っている」までにとどめるのが安全である。
+</div>
+
+<h3>口頭で 30 秒で言う骨</h3>
+
+<blockquote>
+本来解きたいのは「アクチュエータを動かしている<strong>時間</strong>を最小化する」問題で、これは入力の L0 ノルム最小化（maximum hands-off control）に当たります。ただし L0 は支持集合の組合せになるため、圧縮センシングと同じ緩和で L1 に置き換えます。<br><br>
+一致の十分条件は可到達性と A の正則性ですが、<strong>本研究の対象系は A が冪零でこれを満たしません。</strong>「L1 最適解が bang-off-bang なら L0 最適解でもある」という別経路もありますが、実測すると §2.6 の解は非ゼロ 11 成分のうち 9 個が飽和値で<strong>2 成分が中間値</strong>、厳密な3値ではないため前提を満たしません。<br><br>
+そこで <strong>L0 最小の支持を総当たりで求め、その上で L1 最適値が達成されることを数値で確認しました</strong>（検証した全6事例で成立）。したがって L0 最適性は一般には主張せず、検証した事例で成り立つという限定で述べています。
+</blockquote>
+
+<footer>
+出典: <code>docs/thesis/chapter2.md</code> §2.3〜§2.6、<code>docs/thesis/chapter3.md</code> §3.4、<code>docs/次回研究発表会への回答事項.md</code> A 節、<code>results/2026-11-26_l0_support/notes.md</code>（S8・<code>rover/l0_bruteforce.py</code>）。参考文献 [3] 永原「最適制御とスパースモデリング」、[6] Ikeda and Nagahara, ACC 2016。<br>
+第4節の3行は [6] の主張を不等式から組み立て直したもので、定理1（可到達性＋A の正則性）を経由しない。ただし第5節のとおり §2.6 の解では前提が満たされないため、実際の論拠は第6節の総当たり検証に置く。<br>
+PDF の再生成: <code>uv run python docs/build_l0l1_pdf.py</code>（Chrome headless。HTML が原本で、PDF は <code>.gitignore</code> 対象）
+</footer>
+
+</div>
+</body>
+</html>
